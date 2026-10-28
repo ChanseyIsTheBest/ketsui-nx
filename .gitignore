@@ -1,11 +1,13 @@
-# Nothing derived from the game is ever committed: its files, the code generated from default.xex and the eight game
-# cores, the shaders made from them, and the binaries built from that code. Everyone makes them from their own copy.
+# Nothing derived from the game is ever committed: its files, the code generated from default.xex, the shaders made
+# from them, and the binaries built from that code. Everyone makes them from their own copy.
 
 # --- Game files and what is made from them -------------------------------------
 /assets/
 /game/
 /dlc/
 /app/generated/
+# the hand-written natives tools/hand_natives.py makes from the generated code (docs/building.md)
+/app/src/cpu/hot/h_*.h
 *.xex
 *.xexp
 *.iso

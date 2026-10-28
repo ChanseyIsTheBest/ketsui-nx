@@ -16,12 +16,12 @@ the first time it is called. Each pass:
   5. the accepted ones go to app/overrides.toml with their evidence (where the pointer is stored), and the real
      codegen runs again, so the next pass sees the code they exposed.
 
-  python tools/pointer_fixpoint.py [--module default|guwange01|guwange01_coop|guwange_arrange|guwange_blue]
+  python tools/pointer_fixpoint.py [--module default|guwange01|guwange01_coop|ketsui_arrange|ketsui_blue]
       [--scratch out/ptrscan] [--dry-run]
 
---module picks the binary: default.xex (entries go to app/guwange_overrides.toml) or a game core from module/ (entries
-go to app/guwange_overrides_<core>.toml, which the manifest includes for that core). The image dump is the one
-tools/codegen.ps1 leaves: out/default_image.bin, out/<Core>_x360_image.bin. (guwange-nx, 2026-10-21: futari-nx's tool
+--module picks the binary: default.xex (entries go to app/ketsui_overrides.toml) or a game core from module/ (entries
+go to app/ketsui_overrides_<core>.toml, which the manifest includes for that core). The image dump is the one
+tools/codegen.ps1 leaves: out/default_image.bin, out/<Core>_x360_image.bin. (ketsui-nx, 2026-10-21: futari-nx's tool
 with Guwange's file names; the TU's .xexp / .dllp beside each binary applies in the scratch codegen too.)
 
 Needs rexglue (sdk/out/<platform>/rexglue[.exe] or $REXGLUE), the game in assets/game_root, an existing generated
@@ -40,11 +40,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(ROOT, 'app')
 TOOLS = os.path.join(ROOT, 'tools')
 GEN = os.path.join(APP, 'generated', 'default')
-MANIFEST = os.path.join(APP, 'guwange_manifest.toml')
-OVERRIDES = os.path.join(APP, 'guwange_overrides.toml')
+MANIFEST = os.path.join(APP, 'ketsui_manifest.toml')
+OVERRIDES = os.path.join(APP, 'ketsui_overrides.toml')
 # The game cores: generated folder -> the DLL's name (module/<name>.dll).
 CORES = {'guwange01': 'Guwange01_x360', 'guwange01_coop': 'Guwange01_coop_x360',
-         'guwange_arrange': 'Guwange_arrange_x360', 'guwange_blue': 'Guwange_blue_x360'}
+         'ketsui_arrange': 'Guwange_arrange_x360', 'ketsui_blue': 'Guwange_blue_x360'}
 XEX = 'default.xex'  # path under assets/game_root
 IMAGE_BASE = 0x82000000
 CODE_LO, CODE_HI = 0x82120000, 0x82970600  # set from the generated tree in main()
@@ -64,7 +64,7 @@ def find_rexglue():
 
 
 def pch_value(name):
-    text = open(os.path.join(GEN, 'guwange_pch.h'), errors='replace').read()
+    text = open(os.path.join(GEN, 'ketsui_pch.h'), errors='replace').read()
     return int(re.search(r'define REX_%s (0x[0-9A-Fa-f]+)' % name, text).group(1), 16)
 
 
@@ -112,7 +112,7 @@ def built_addresses(image, lo, hi):
 
 def sized_functions():
     """[(start, end)] of the functions the overrides give an explicit size: a pointer inside one is not an entry
-    (guwange-nx, 2026-10-21: 0x82190C60, inside the sized sub_82190C50, made the scratch manifest fail with
+    (ketsui-nx, 2026-10-21: 0x82190C60, inside the sized sub_82190C50, made the scratch manifest fail with
     "Overlapping boundaries")."""
     text = open(OVERRIDES).read() if os.path.exists(OVERRIDES) else ''
     return [(int(m.group(1), 16), int(m.group(1), 16) + int(m.group(2), 0))
@@ -148,7 +148,7 @@ def scratch_codegen(rexglue, d, candidates):
     ov = open(OVERRIDES).read()
     m = re.search(r'^\[functions\]\s*$', ov, re.M)
     body = ''.join(f'"0x{a:08X}" = {{ }}\n' for a in sorted(candidates))
-    open(os.path.join(d, 'guwange_overrides.toml'), 'w').write(ov[:m.end()] + '\n' + body + ov[m.end():])
+    open(os.path.join(d, 'ketsui_overrides.toml'), 'w').write(ov[:m.end()] + '\n' + body + ov[m.end():])
     game = os.path.join(ROOT, 'assets', 'game_root').replace('\\', '/')
     man = open(MANIFEST).read()
     # Only the entrypoint: the candidates are in default.xex, and the [[modules]] entries (the stage-data DLL) would
@@ -157,14 +157,14 @@ def scratch_codegen(rexglue, d, candidates):
     man = re.sub(r'^game_root = .*$', f'game_root = "{game}"', man, flags=re.M)
     man = re.sub(r'^file_path = .*$', f'file_path = "{game}/{XEX}"', man, flags=re.M)
     man = re.sub(r'^out_directory_path = .*$', 'out_directory_path = "gen"', man, flags=re.M)
-    man = re.sub(r'^includes = .*$', 'includes = ["guwange_overrides.toml"]', man, flags=re.M)
+    man = re.sub(r'^includes = .*$', 'includes = ["ketsui_overrides.toml"]', man, flags=re.M)
     if XEX != 'default.xex':
         # A game core translated on its own, as the entrypoint of the scratch project.
         man = man.replace('[entrypoint]' + chr(10), '[entrypoint]' + chr(10) + 'is_dll = true' + chr(10), 1)
-    open(os.path.join(d, 'guwange_manifest.toml'), 'w').write(man)
+    open(os.path.join(d, 'ketsui_manifest.toml'), 'w').write(man)
     log = os.path.join(d, 'codegen.log')
     with open(log, 'w') as f:
-        subprocess.run([rexglue, '--force', 'codegen', 'guwange_manifest.toml'], cwd=d, stdout=f,
+        subprocess.run([rexglue, '--force', 'codegen', 'ketsui_manifest.toml'], cwd=d, stdout=f,
                        stderr=subprocess.STDOUT)
     return os.path.join(d, 'gen'), log
 
@@ -317,7 +317,7 @@ def main():
     global CODE_LO, CODE_HI, GEN, OVERRIDES, XEX, IMAGE_BASE
     GEN = os.path.join(APP, 'generated', a.module)
     if a.module != 'default':
-        OVERRIDES = os.path.join(APP, f'guwange_overrides_{a.module}.toml')
+        OVERRIDES = os.path.join(APP, f'ketsui_overrides_{a.module}.toml')
         XEX = f'module/{CORES[a.module]}.dll'
     IMAGE_BASE = pch_value('IMAGE_BASE')
     image_name = 'default_image.bin' if a.module == 'default' else f'{CORES[a.module]}_image.bin'

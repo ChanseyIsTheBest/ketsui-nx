@@ -44,6 +44,33 @@ void QueuePrefetched(const void *prefetch0, const void *prefetch1, std::function
 // to the fence, and the game may free what they use once it has passed.
 void QueueFenceCompletion(u32 completion_va, u32 fence, uint64_t after_callback);
 
+// ketsui-nx (2026-10-27, banjo_renut_swap_at_vblank): QueueFenceCompletion for the fence a Swap ends its frame with,
+// written at the first guest vblank after the Swap (GuestVblank), and never before the render thread has reached it,
+// as on the console: the GPU flips at a vblank (the Swap's wait in the ring) and only then writes the fence. A game
+// that waits for its frame's fence before it starts the next (Ketsui) then runs one frame per vblank, as on the
+// console, instead of as fast as the host presents. A frame the render thread finishes after that vblank completes
+// when it does (not a vblank later). Fences queued after it complete after it.
+void QueueSwapFenceCompletion(u32 completion_va, u32 fence, uint64_t after_callback);
+// ketsui-nx: the guest's vertical blank (futari_renut_vblank.cpp's Vblank): writes the Swap fences waiting for it.
+void GuestVblank();
+// ketsui-nx (banjo_renut_kick_idle_wait): nothing queued since the newest fence, and the newest Swap fence still waits
+// for its vblank: a KickOff now would only add an empty fence behind it.
+bool IdleKickWouldWait();
+// ketsui-nx (2026-10-28, banjo_renut_kick_idle_fence): a frame-end poll's fence written now (true), as the render thread
+// would on reaching it: nothing queued since the newest fence, every item done, no fence pending, no Swap fence waiting
+// for its vblank. False: queue it as before. PollFenceReport: the 10 s counts ("" when none).
+bool TryCompleteIdleFence(u32 completion_va, u32 fence, uint64_t after_callback);
+// ketsui-nx (2026-10-28, banjo_renut_kick_busy_wait): nothing queued since the newest fence, no Swap fence waiting for
+// its vblank, but the render thread still has work or fences pending: a KickOff now would only add an empty fence
+// behind them (a poll spinning until the render thread catches up).
+bool IdleKickBehindWork();
+// ketsui-nx (2026-10-28, ketsui_renut_queue_drain): the next Swap fence waits one vblank more than it would, once, so
+// the frame after it starts a refresh later (the vblank thread's drain of a display queue stuck one image deep).
+void HoldNextSwapFence();
+std::string PollFenceReport();
+// ketsui-nx: Swap fences written so far (a game that waits for them starts a frame at each).
+uint64_t SwapFencesWritten();
+
 // Guest callbacks (D3DDevice_InsertCallback) are numbered from 1 by the game
 // side (callbacks.h). The render thread reaches callback 'seq' once the work
 // queued before this marker has run; a guest thread then runs it and reports

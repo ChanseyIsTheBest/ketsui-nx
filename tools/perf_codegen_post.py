@@ -34,11 +34,11 @@ APP = os.path.join(ROOT, 'app')
 SDK = os.path.join(ROOT, 'sdk')
 GEN = os.path.join(APP, 'generated')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import project  # noqa: E402  (guwange-nx, 2026-10-22: <name>_recomp.N.cpp, <name>_pch.h)
+import project  # noqa: E402  (ketsui-nx, 2026-10-22: <name>_recomp.N.cpp, <name>_pch.h)
 PROJECT = project.name()
 SOURCES = [os.path.join(APP, 'src'), os.path.join(SDK, 'src'), os.path.join(SDK, 'include'), os.path.join(APP, 'CMakeLists.txt')]
 SOURCES += [os.path.join(APP, f) for f in os.listdir(APP) if f.endswith('.toml')]
-# guwange-nx (2026-10-22): a tree cloned from futari-nx keeps futari-nx's sources and tomls, unbuilt: their Futari
+# ketsui-nx (2026-10-22): a tree cloned from futari-nx keeps futari-nx's sources and tomls, unbuilt: their Futari
 # addresses would count as hooks of the same addresses here (every one a call left on the weak alias).
 unbuilt = project.unbuilt
 

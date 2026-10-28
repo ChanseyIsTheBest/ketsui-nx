@@ -9,6 +9,7 @@
  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
  */
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -629,6 +630,38 @@ X_RESULT ContentManager::UnmountAndDeleteContent(uint64_t xuid,
     return X_ERROR_SUCCESS;
   }
   return X_ERROR_FILE_NOT_FOUND;
+}
+
+uint64_t ContentManager::StfsPackageSize(const std::filesystem::path& folder) {
+  std::error_code ec;
+  if (!std::filesystem::is_directory(folder, ec)) {
+    return 0;
+  }
+  // STFS (Xbox 360 content packages): 4 KB blocks after the header. A console-made package (CON, as XamContentCreate
+  // makes them) has a 0xAD0E-byte header, rounded to 0xB000. Every file takes ceil(size / 4 KB) blocks, the file table
+  // one block per 64 entries (files and folders), and every 170 blocks have a hash table, kept in two copies in a
+  // writable package (a further level per 170 tables). Ketsui (2026-10-26) checks that its 2,048-byte save is in a
+  // 61,440-byte package: 0xB000 + 2 hash blocks + 1 file table block + 1 data block.
+  constexpr uint64_t kBlock = 0x1000;
+  constexpr uint64_t kHeader = 0xB000;
+  constexpr uint64_t kHashesPerTable = 170;
+  uint64_t entries = 0;
+  uint64_t data_blocks = 0;
+  for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
+       !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+    ++entries;
+    if (it->is_regular_file(ec)) {
+      data_blocks += (it->file_size(ec) + kBlock - 1) / kBlock;
+    }
+  }
+  const uint64_t table_blocks = std::max<uint64_t>(1, (entries + 63) / 64);
+  const uint64_t blocks = table_blocks + data_blocks;
+  uint64_t hash_tables = 0;
+  for (uint64_t level = (blocks + kHashesPerTable - 1) / kHashesPerTable;; level = (level + kHashesPerTable - 1) / kHashesPerTable) {
+    hash_tables += level;
+    if (level <= 1) break;
+  }
+  return kHeader + (blocks + 2 * hash_tables) * kBlock;
 }
 
 std::filesystem::path ContentManager::ResolveGameUserContentPath() {

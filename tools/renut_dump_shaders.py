@@ -43,8 +43,8 @@ except ImportError:
     sys.exit("error: the 'xxhash' module is required (pip install xxhash)")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# guwange-nx (2026-10-21): Guwange's five binaries (out/<module>_image.bin as tools/codegen.ps1 names the dumps).
-MODULES = ("default", "Guwange01_x360", "Guwange01_coop_x360", "Guwange_arrange_x360", "Guwange_blue_x360")
+# ketsui-nx (2026-10-27): Ketsui is one binary, default.xex (out/default_image.bin as tools/codegen.ps1 names the dump).
+MODULES = ("default",)
 EXPECTED_BASE = {"default": 0x82000000}  # the game cores: 0x88000000
 CORE_BASE = 0x88000000
 

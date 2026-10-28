@@ -1,0 +1,12 @@
+# Ketsui: hot leaves of up to 160 guest instructions the copies call inline (tools/localize_native.py): the
+# leaves among the 100 candidates of localized.txt / localized_bulk.txt.
+829D9BB8  # 38 instructions
+828E4440  # 54 instructions
+828C9AA8  # 68 instructions
+82C1E2D8  # 56 instructions
+82C72D18  # 70 instructions
+829E27C0  # 40 instructions
+82BF52B0  # 58 instructions
+82BE9BD8  # 16 instructions
+82C73118  # 34 instructions
+828D7DA8  # 32 instructions

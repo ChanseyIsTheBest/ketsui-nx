@@ -9,7 +9,20 @@
  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
  */
 
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+
+#include <fmt/format.h>
+
 #include <rex/cvar.h>
+#include <rex/filesystem/device.h>
+#include <rex/filesystem/devices/null_entry.h>
 #include <rex/kernel/xam/private.h>
 #include <rex/logging.h>
 #include <rex/math.h>
@@ -18,6 +31,7 @@
 #include <rex/string.h>
 #include <rex/system/kernel_state.h>
 #include <rex/system/xam/content_device.h>
+#include <rex/system/xam/content_manager.h>
 #include <rex/system/xenumerator.h>
 #include <rex/system/xtypes.h>
 
@@ -44,16 +58,183 @@ u32 XamContentGetLicenseMask_entry(mapped_u32 mask_ptr, mapped_void overlapped_p
   }
 }
 
-u32 XamContentResolve_entry(u32 user_index, mapped_void content_data_ptr, mapped_void buffer_ptr,
-                            u32 buffer_size, u32 unk1, u32 unk2, u32 unk3) {
-  auto content_data = content_data_ptr.as<XCONTENT_DATA*>();
+namespace {
 
-  // Result of buffer_ptr is sent to RtlInitAnsiString.
-  // buffer_size is usually 260 (max path).
-  // Games expect zero if resolve was successful.
-  assert_always();
-  REXKRNL_WARN("XamContentResolve unimplemented!");
-  return X_ERROR_NOT_FOUND;
+// The packages XamContentResolve names (ketsui-nx, 2026-10-26). On the Xbox 360 a content package is one STFS file,
+// and a title can resolve its path and open it: Ketsui opens its save package (NtOpenFile, then
+// NtQueryInformationFile FileNetworkOpenInformation) and loads only when its size is 61,440 bytes. The SDK keeps a
+// package as a folder of its files, so this device shows each resolved package as a read-only file of the size its
+// STFS package would have on the console (ContentManager::StfsPackageSize), present only while the folder exists.
+// Reading it gives no bytes: the titles seen so far only ask for its size.
+std::string Lower(std::string s) {
+  for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+class ContentPackageEntry : public rex::filesystem::NullEntry {
+ public:
+  ContentPackageEntry(rex::filesystem::Device* device, rex::filesystem::Entry* parent, std::string path,
+                      bool directory)
+      : NullEntry(device, parent, std::move(path)) {
+    attributes_ = directory ? rex::filesystem::kFileAttributeDirectory
+                            : rex::filesystem::kFileAttributeNormal | rex::filesystem::kFileAttributeReadOnly;
+  }
+  void SetSize(uint64_t size) {
+    size_ = size;
+    allocation_size_ = size;
+  }
+  // A folder's package: in children_ (what Entry::GetChild searches) while its files exist, else kept aside (never
+  // destroyed, so a File opened on it earlier stays valid).
+  ContentPackageEntry* Package(const std::string& path, bool present) {
+    for (auto* list : {&children_, &hidden_}) {
+      for (auto it = list->begin(); it != list->end(); ++it) {
+        if ((*it)->path() != path) continue;
+        auto* entry = static_cast<ContentPackageEntry*>(it->get());
+        auto* target = present ? &children_ : &hidden_;
+        if (list != target) {
+          target->push_back(std::move(*it));
+          list->erase(it);
+        }
+        return entry;
+      }
+    }
+    auto entry = std::make_unique<ContentPackageEntry>(device_, this, path, false);
+    auto* raw = entry.get();
+    (present ? children_ : hidden_).push_back(std::move(entry));
+    return raw;
+  }
+
+ private:
+  std::vector<std::unique_ptr<rex::filesystem::Entry>> hidden_;
+};
+
+class ContentPackageDevice : public rex::filesystem::Device {
+ public:
+  static constexpr const char* kMountPath = "\\Device\\XamContentPackages";
+
+  ContentPackageDevice() : Device(kMountPath) {}
+
+  bool Initialize() override {
+    root_ = std::make_unique<ContentPackageEntry>(this, nullptr, "", true);
+    return true;
+  }
+  void Dump(rex::string::StringBuffer* string_buffer) override {}
+  bool is_read_only() const override { return true; }
+  const std::string& name() const override { return name_; }
+  uint32_t attributes() const override { return 0; }
+  uint32_t component_name_max_length() const override { return 40; }
+  uint32_t total_allocation_units() const override { return 0x10; }
+  uint32_t available_allocation_units() const override { return 0; }
+  uint32_t sectors_per_allocation_unit() const override { return 0x80; }
+  uint32_t bytes_per_sector() const override { return 0x200; }
+
+  // `key` (<xuid>\<title>\<type>\<file name>) names the package under the mount path; `folder` holds its files on the
+  // host. Each folder level above it resolves as a directory (NtCreateFile resolves the parent, then asks it for the
+  // file by name).
+  void Register(const std::string& key, const std::filesystem::path& folder) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const std::string lower = Lower(key);
+    packages_[lower] = Package{key, folder};
+    for (size_t at = lower.find('\\'); at != std::string::npos; at = lower.find('\\', at + 1)) {
+      auto& dir = dirs_[lower.substr(0, at)];
+      if (!dir) dir = std::make_unique<ContentPackageEntry>(this, root_.get(), key.substr(0, at), true);
+    }
+  }
+
+  rex::filesystem::Entry* ResolvePath(std::string_view path) override {
+    // The VFS passes what follows the mount path, separator included.
+    while (!path.empty() && (path.front() == '\\' || path.front() == '/')) path.remove_prefix(1);
+    if (path.empty()) return root_.get();
+    std::lock_guard<std::mutex> lock(mutex_);
+    const std::string key = Lower(std::string(path));
+    if (auto dir = dirs_.find(key); dir != dirs_.end()) {
+      Refresh(key, dir->second.get());
+      return dir->second.get();
+    }
+    const auto package = packages_.find(key);
+    if (package == packages_.end()) return nullptr;
+    const size_t at = key.rfind('\\');
+    if (at == std::string::npos) return nullptr;
+    auto* dir = dirs_[key.substr(0, at)].get();
+    if (!dir) return nullptr;
+    Refresh(key.substr(0, at), dir);
+    auto* entry = dir->Package(package->second.path, true);
+    return entry->size() ? entry : nullptr;
+  }
+
+ private:
+  struct Package {
+    std::string path;  // as resolved (the entry's path keeps its case)
+    std::filesystem::path folder;
+  };
+
+  // The packages of folder `dir_key`, sized from their files now; a package with no files is not in the folder.
+  void Refresh(const std::string& dir_key, ContentPackageEntry* dir) {
+    for (const auto& [key, package] : packages_) {
+      if (key.size() <= dir_key.size() || key.compare(0, dir_key.size(), dir_key) != 0 || key[dir_key.size()] != '\\' ||
+          key.find('\\', dir_key.size() + 1) != std::string::npos) {
+        continue;
+      }
+      const uint64_t size = rex::system::xam::ContentManager::StfsPackageSize(package.folder);
+      dir->Package(package.path, size != 0)->SetSize(size);
+    }
+  }
+
+  std::string name_ = "XamContentPackages";
+  std::unique_ptr<ContentPackageEntry> root_;
+  std::mutex mutex_;
+  std::unordered_map<std::string, Package> packages_;
+  std::unordered_map<std::string, std::unique_ptr<ContentPackageEntry>> dirs_;
+};
+
+ContentPackageDevice* PackageDevice() {
+  static ContentPackageDevice* device = [] {
+    auto owned = std::make_unique<ContentPackageDevice>();
+    ContentPackageDevice* raw = owned.get();
+    if (!owned->Initialize() || !REX_KERNEL_STATE()->file_system()->RegisterDevice(std::move(owned))) {
+      REXKRNL_ERROR("XamContentResolve: cannot register {}", ContentPackageDevice::kMountPath);
+      return static_cast<ContentPackageDevice*>(nullptr);
+    }
+    return raw;
+  }();
+  return device;
+}
+
+}  // namespace
+
+// The path of a content package (xenia-edge's design: <xuid>\<title>\<type>\<file name>, the xuid a profile's for saved
+// games only), here under the device above. Result of buffer_ptr is sent to RtlInitAnsiString; buffer_size is usually
+// 260 (max path). The package itself need not exist: opening the path then fails, as on the console.
+u32 XamContentResolve_entry(u32 user_index, mapped_void content_data_ptr, mapped_void buffer_ptr,
+                            u32 buffer_size, u32 create_directory, mapped_void root_name_ptr,
+                            mapped_void overlapped_ptr) {
+  if (!content_data_ptr || !buffer_ptr || !buffer_size || root_name_ptr) {
+    return X_ERROR_INVALID_PARAMETER;
+  }
+  XCONTENT_AGGREGATE_DATA content_data = *content_data_ptr.as<XCONTENT_DATA*>();
+  uint64_t xuid = 0;
+  if (content_data.content_type == XContentType::kSavedGame && user_index < 4) {
+    xuid = REX_KERNEL_STATE()->user_profile()->xuid();
+  }
+  auto* device = PackageDevice();
+  if (!device) {
+    return X_ERROR_NOT_FOUND;
+  }
+  const std::string key = fmt::format("{:016X}\\{:08X}\\{:08X}\\{}", xuid, REX_KERNEL_STATE()->title_id(),
+                                      static_cast<uint32_t>(content_data.content_type.get()),
+                                      content_data.file_name());
+  device->Register(key, REX_KERNEL_STATE()->content_manager()->PackageHostPath(xuid, content_data));
+  const std::string path = std::string(ContentPackageDevice::kMountPath) + "\\" + key;
+  char* out = buffer_ptr.as<char*>();
+  const size_t n = std::min<size_t>(path.size(), buffer_size - 1);
+  std::memcpy(out, path.data(), n);
+  out[n] = '\0';
+  REXKRNL_DEBUG("XamContentResolve({}, '{}') -> {}", user_index, content_data.file_name(), path);
+  if (overlapped_ptr) {
+    REX_KERNEL_STATE()->CompleteOverlappedImmediate(overlapped_ptr.guest_address(), X_ERROR_SUCCESS);
+    return X_ERROR_IO_PENDING;
+  }
+  return X_ERROR_SUCCESS;
 }
 
 // https://github.com/MrColdbird/gameservice/blob/master/ContentManager.cpp

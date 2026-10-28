@@ -1,4 +1,3 @@
-// guwange-nx: device offsets translated to Guwange's XDK (tools/renut_guwange_layout.py)
 // futari-nx (2026-10-19): the guest's vertical blank with Renut's renderer.
 //
 // Renut's renderer has no GPU and so no graphics interrupt, and the SDK runs no vsync thread without its own graphics
@@ -9,6 +8,7 @@
 // is not there: this thread calls the handler itself, on a guest thread, as the SDK's vsync thread calls the
 // dispatcher: a 60 Hz timer (or Futari's display-synced vblank on the Switch, futari_vblank_display_sync), or one per
 // Swap in lockstep runs (vblank_per_swap). Only for the bytes it was written for (the handler's code hash).
+// ketsui-nx: guest addresses translated to Ketsui's (tools/renut_ketsui_layout.py)
 #include "renut_engine/futari_renut_vblank.h"
 
 #include <algorithm>
@@ -42,17 +42,20 @@
 #endif
 #include <thread>
 
+#include "cpu/banjo_enhancements.h"  // ketsui-nx: the masters (ketsui_renut_queue_drain)
 #include "native/futari_native.h"
 #include "renut_engine/display_sync.h"  // futari-nx: DefaultWindowDisplay
 #include "renut_engine/gpu/backend/video.h"
 #include "renut_engine/gpu/d3d/d3d_native.h"
+#include "renut_engine/gpu/backend/render_thread.h"  // ketsui-nx: GuestVblank (banjo_renut_swap_at_vblank)
 #if REX_PLATFORM_SWITCH
 #include "me/me_platform_compat.h"  // RexSwitchPinCurrentThreadToCore and the priority helper
 #endif
 
-namespace guwange::late_input {
-void NoteVblank();  // src/guwange_late_input.cpp
-}  // namespace guwange::late_input
+namespace ketsui::late_input {
+void NoteVblank();  // src/ketsui_late_input.cpp
+void NoteDisplayed(bool in_time);  // likewise (ketsui_late_input_display_guard)
+}  // namespace ketsui::late_input
 
 REXCVAR_DECLARE(bool, futari_vblank_sleep_exact);   // src/me/me_native_system.cpp
 REXCVAR_DECLARE(bool, futari_vblank_display_sync);  // likewise
@@ -70,13 +73,27 @@ REXCVAR_DEFINE_INT32(futari_renut_vblank_core, 2, "Futari/Renut",
                      "(0x2C), pinned to this core (-1 = as created: the default priority and core)")
     .range(-1, 2)
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+// ketsui-nx (2026-10-28, the user: "keep double buffering and empty the queue once"): see FromDisplay.
+REXCVAR_DEFINE_BOOL(ketsui_renut_queue_drain, true, "Ketsui/Renut",
+                    "Renut on the Switch, input lag: when every new image misses its refresh for a second (the display "
+                    "queue stuck one image deep: with 2 swapchain images each image waits for the one the display gives "
+                    "back at that same refresh), the next Swap's fence is held one vblank more, once. The game's next "
+                    "frame starts a refresh later, the queue empties, and every image after it is shown a refresh "
+                    "sooner (about 17 ms less input lag). Again at the earliest 5 s later, doubled up to 5 minutes "
+                    "while the queue keeps filling again soon after")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_INT32(ketsui_diag_swap_hold_every_s, 0, "Ketsui/Diagnostics",
+                     "Diagnostic (the timer vblank: the PC): hold a Swap's fence one vblank more every this many "
+                     "seconds, as ketsui_renut_queue_drain does; 0 = off")
+    .range(0, 3600)
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 namespace futari::renut_vblank {
 namespace {
 
-constexpr uint32_t kVblankHandler = 0x82264E88u;  // Direct3D's vblank handler (device)
-constexpr uint32_t kVblankHandlerWords = 70;
-constexpr uint64_t kVblankHandlerHash = 0x7D733D9A9AF2BAAEull;
+constexpr uint32_t kVblankHandler = 0x828DDB70u;  // Direct3D's vblank handler (device)
+constexpr uint32_t kVblankHandlerWords = 69;
+constexpr uint64_t kVblankHandlerHash = 0xBE1E3F741ED93A78ull;
 #if REX_PLATFORM_SWITCH
 constexpr int kVblankThreadPriority = 0x2C;  // the render thread's (banjo_renut_tuning.cpp kRenderThreadPriority)
 #endif
@@ -103,7 +120,13 @@ bool SameHandler(rex::system::KernelState* kernel) {
 // One vblank: Direct3D's handler on this guest thread, when the title's device exists.
 void Vblank() {
   rex::latency::TraceEvent("guest vblank");  // guwange-nx: the latency trace
-  ::guwange::late_input::NoteVblank();        // guwange-nx: futari_late_input's vblank time
+  ::ketsui::late_input::NoteVblank();        // guwange-nx: futari_late_input's vblank time
+  // ketsui-nx (banjo_renut_swap_at_vblank): the Swap fences waiting for this vblank, written once Direct3D's handler
+  // (the game's vblank callback) has run, as on the console, where the interrupt runs as the flip happens and the game
+  // thread polls its fence later; and also when there is no device or handler: the flip is the renderer's.
+  struct ReleaseSwapFences {
+    ~ReleaseSwapFences() { renut::gpu::render_thread::GuestVblank(); }
+  } release_swap_fences;
   const uint32_t device = renut::gpu::native::GlobalDevice();
   if (!device) return;
   auto* thread = rex::system::XThread::GetCurrentThread();
@@ -154,6 +177,14 @@ bool FromDisplay() {
   uint32_t good = 0;
   uint64_t presented_at_vsync = renut::gpu::Video::PresentCount();
   uint64_t phase_misses = 0, phase_report = 0;
+  // ketsui-nx (ketsui_renut_queue_drain): new images in a row not finished at their refresh; the last drain, the least
+  // time to the next one, the drains so far.
+  static const bool drain_on = banjo::EnhancementActive(banjo::EnhancementGroup::kNonCpu,
+                                                        REXCVAR_GET(ketsui_renut_queue_drain));
+  constexpr uint32_t kDrainAfter = 60;
+  constexpr uint64_t kDrainGapNs = 5000000000ull, kDrainGapMaxNs = 300000000000ull;
+  uint32_t late_run = 0;
+  uint64_t last_drain = 0, drain_gap = kDrainGapNs, drains = 0;
   while (g_running.load(std::memory_order_acquire)) {
     // 100 ms: should the display stop refreshing, the game still gets a vblank now and then.
     const bool refreshed = R_SUCCEEDED(eventWait(&vsync, 100000000ull));
@@ -164,6 +195,24 @@ bool FromDisplay() {
       presented_at_vsync = presented;
       const int ready = new_image ? renut::gpu::Video::PresentDone(presented) : -1;
       rex::latency::NoteDisplayVsync(ready);
+      if (ready >= 0)
+        ::ketsui::late_input::NoteDisplayed(ready == 1);  // ketsui-nx (2026-10-28): late input backs off on a late image
+      // ketsui-nx (ketsui_renut_queue_drain): a second of new images all late is the queue one image deep (one late
+      // image fills it, and with 2 images nothing empties it while the game keeps up): one Swap fence a vblank later.
+      // A queue that fills again within twice the gap is real lateness: the gap doubles; else it starts again at 5 s.
+      if (drain_on && ready == 0 && ++late_run >= kDrainAfter) {
+        const uint64_t at = armTicksToNs(armGetSystemTick());
+        if (!last_drain || at - last_drain >= drain_gap) {
+          drain_gap = last_drain && at - last_drain < 2 * drain_gap ? std::min(drain_gap * 2, kDrainGapMaxNs)
+                                                                     : kDrainGapNs;
+          last_drain = at;
+          renut::gpu::render_thread::HoldNextSwapFence();
+          ++drains;
+          late_run = 0;
+        }
+      } else if (ready == 1) {
+        late_run = 0;
+      }
       if (phase_auto) {
         const uint64_t at = armTicksToNs(armGetSystemTick());
         if (ceiling_until && at > ceiling_until) {
@@ -183,8 +232,9 @@ bool FromDisplay() {
         if (++phase_report >= 600) {  // every 10 s
           phase_report = 0;
           REXLOG_INFO("[latency] guest vblank {:.2f} ms after the display's refresh (futari_vblank_phase_auto), "
-                      "ceiling {:.2f} ms, {} images not finished at their refresh in all", double(delay_us) / 1000.0,
-                      double(ceiling_us) / 1000.0, phase_misses);
+                      "ceiling {:.2f} ms, {} images not finished at their refresh in all; {} queue drains in all "
+                      "(ketsui_renut_queue_drain)", double(delay_us) / 1000.0,
+                      double(ceiling_us) / 1000.0, phase_misses, drains);
         }
       }
     }
@@ -221,6 +271,9 @@ int Loop() {
   const auto interval = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0 / hz));
   auto next = Clock::now() + interval;
   uint64_t last_swap = rex::kernel::xboxkrnl::GuestSwapCount();
+  // ketsui-nx (ketsui_diag_swap_hold_every_s): the queue drain's hold, on a timer, to test it where there is no display.
+  const int32_t hold_every_s = REXCVAR_GET(ketsui_diag_swap_hold_every_s);
+  auto next_hold = Clock::now() + std::chrono::seconds(hold_every_s);
   REXLOG_INFO("[renut] vblank: a {:.2f} Hz timer{}", hz,
               rex::kernel::xboxkrnl::VblankPerSwap() ? " (vblank_per_swap: one per Swap)" : "");
 #if defined(_WIN32)
@@ -240,6 +293,10 @@ int Loop() {
     while (now >= next) {
       Vblank();
       next += interval;
+    }
+    if (hold_every_s > 0 && now >= next_hold) {
+      renut::gpu::render_thread::HoldNextSwapFence();
+      next_hold = now + std::chrono::seconds(hold_every_s);
     }
     if (REXCVAR_GET(futari_vblank_sleep_exact)) {
       const auto wait = std::chrono::duration_cast<std::chrono::microseconds>(next - Clock::now());

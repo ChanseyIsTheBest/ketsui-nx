@@ -48,7 +48,7 @@ BL = re.compile(r'^0x([0-9a-fA-F]{8})$')
 
 def call_sites(gen):
     """callee -> Counter of the guest instructions setting r4 in the straight line before the call (with r5 set by
-    an `li r5,N` there too). guwange-nx (2026-10-22): a call is its guest `bl` (the codegen's comment line), not the
+    an `li r5,N` there too). ketsui-nx (2026-10-22): a call is its guest `bl` (the codegen's comment line), not the
     C++ call statement under it: tools/inline_memcalls.py replaces the statements of the constant-size calls with
     inline copies, and a second run of the steps then found no memcpy in a game core (198 of its 201 calls were
     inline). The comments stay through every step."""

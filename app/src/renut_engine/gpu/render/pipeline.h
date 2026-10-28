@@ -87,8 +87,12 @@ struct PipelineKey {
   // 920 + i (tools/deko3d_glsl_opt.py, pass boundfmt); 0 = read at run time. From the shader and the declaration, which
   // the key has already: no new pipelines.
   uint32_t bound_types[16];
-  uint32_t reserved;  // 0 (the key is compared and hashed as bytes)
+  uint32_t reserved;  // bits 0-2 the in-run A/B halves (draw.cpp), kKeyClipDisable; else 0 (compared and hashed as bytes)
 };
+
+// ketsui-nx (2026-10-28, ketsui_renut_clip_disable): PipelineKey::reserved bit 3, the guest's PA_CL_CLIP_CNTL.CLIP_DISABLE
+// (bit 16): the pipeline clamps depth instead of clipping against the depth range. Kept in the pipeline list's records.
+constexpr uint32_t kKeyClipDisable = 8u;
 
 // banjo-nx (banjo_gpu_blend_skip): for the key's other fields, 1 when its one target keeps its value for a source alpha
 // of 0 or less, 2 when it does for a whole source of 0 or less, 0 otherwise (shader_common.h, banjoBlendSkip).

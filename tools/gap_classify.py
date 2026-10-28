@@ -89,7 +89,7 @@ def reads_undefined_at_entry(instructions):
                 return True
         if dest:
             defined.add(dest)
-        # Every instruction that sets XER[CA] (guwange-nx, 2026-10-21: subfc was missing, so the subfc/subfe pair
+        # Every instruction that sets XER[CA] (ketsui-nx, 2026-10-21: subfc was missing, so the subfc/subfe pair
         # of the comparator sub_824F4488 read as a fragment's undefined carry).
         if op.rstrip(".") in ("addic", "subfic", "addc", "subfc", "adde", "subfe", "addze", "subfze", "addme",
                               "subfme", "srawi", "sraw", "sradi", "srad"):

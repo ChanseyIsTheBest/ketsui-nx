@@ -72,9 +72,9 @@ Steps 6 (default.xex), 7, 11 and 13-14 need the generator's image dumps (out/<mo
 tools/codegen.ps1 through REXGLUE_DUMP_IMAGE) and steps 7 and 11 the modules' XEX files (the port's manifest names
 them).
 
-guwange-nx (2026-10-22): the same steps for any port's tree. The module folders, the pch's name, the image dumps and
+ketsui-nx (2026-10-22): the same steps for any port's tree. The module folders, the pch's name, the image dumps and
 the XEX files come from the port's manifest (tools/project.py); step 12 is futari-nx's only (Guwange has no localized
-copies). tools/guwange_post_codegen.py runs tools/spin_forever.py first and then this script.
+copies). tools/ketsui_post_codegen.py runs tools/spin_forever.py first and then this script.
 
 Every step has its compile-time switch back (app/CMakeLists.txt, FUTARI_SWITCH_* and FUTARI_GEN_*), is idempotent, and
 so is the sequence: a second run on a processed tree changes no file (the profile of a PGO build fits only the exact
@@ -96,11 +96,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(ROOT, 'app')
 GEN = os.path.join(APP, 'generated')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import project  # noqa: E402  (guwange-nx, 2026-10-22: the port's names and modules, from its manifest)
+import project  # noqa: E402  (ketsui-nx, 2026-10-22: the port's names and modules, from its manifest)
 TREES = project.trees()
 PCH = project.name() + '_pch.h'
-# Futari's localized copies of its hottest functions (step 12): only in futari-nx's build.
-LOCALIZED = project.name() == 'futari'
+# Step 12, the localized copies of the hottest functions: futari-nx's (its tool, src/native/hot_functions.txt) in
+# futari-nx's build; ketsui-nx's (2026-10-27): bejeweled3-nx's tools/localize_native.py (smart sync, changed-only
+# write-backs, inlined callees) with app/src/cpu/hot/localized.txt and localized_bulk.txt.
+LOCALIZED = project.name() in ('futari', 'ketsui')
 
 
 def run(*args):
@@ -223,8 +225,12 @@ def main():
 
     per_module(trees, steps_a, jobs)
     # 12. The localized copies, from the text as it is now.
-    if not scratch and LOCALIZED:
+    if not scratch and LOCALIZED and project.name() == 'futari':
         run(tool('localize_native.py'), '--list', os.path.join(APP, 'src', 'native', 'hot_functions.txt'))
+    elif not scratch and LOCALIZED:
+        hot = os.path.join(APP, 'src', 'cpu', 'hot')
+        run(tool('localize_native.py'), '--gen', os.path.join(gen, 'default'), '--list',
+            os.path.join(hot, 'localized.txt'), '--bulk', os.path.join(hot, 'localized_bulk.txt'))
     def steps_b(t, run_one):
         folder = os.path.join(gen, t)
         # 13. Link-register write-backs. 14. r1 as a local mirror. (Both read the marks of step 9.)

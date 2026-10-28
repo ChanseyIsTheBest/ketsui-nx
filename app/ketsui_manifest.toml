@@ -1,0 +1,23 @@
+# ReXGlue recompilation manifest for Ketsui: Kizuna Jigoku Tachi Extra (Xbox 360 disc, CAVE / 5pb., title 465607D1).
+#
+# Run tools/codegen.ps1: it calls `rexglue codegen ketsui_manifest.toml`. The project name sets the prefix of
+# everything generated: generated/default/ketsui_{init,pch,funcs}.h, ketsui_recomp.N.cpp and the CMake target
+# ketsui_recomp.
+#
+# default.xex: image base 0x82000000, entry point 0x828D2438, image 20,578,304 bytes. The whole game is this one
+# executable (no game-core modules, unlike Futari and Guwange).
+
+[project]
+name = "ketsui"
+sdk_version = "0.10.0"
+# Your own game files: the disc image extracted (futari-nx's tools/extract_iso.py). Nothing from the game is
+# distributed with this project.
+game_root = "../assets/game_root"
+
+[entrypoint]
+file_path = "../assets/game_root/default.xex"
+out_directory_path = "generated/default"
+#   ketsui_overrides.toml   written by hand: code the automatic function discovery misses, each with its evidence
+#   ketsui_perf.toml        the generator options: speed options exact by construction, and the Xbox 360-exact VMX
+#                           float results
+includes = ["ketsui_overrides.toml", "ketsui_perf.toml"]

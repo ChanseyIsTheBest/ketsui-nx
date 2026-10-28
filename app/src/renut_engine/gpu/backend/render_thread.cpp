@@ -56,9 +56,10 @@ REXCVAR_DEFINE_BOOL(banjo_renut_batch_clock, true, "Banjo/Enhancements",
 
 REXCVAR_DECLARE(bool, futari_late_input);  // futari-nx: src/native/futari_native_frame.cpp
 
-namespace guwange::late_input {
-std::string Report();  // src/guwange_late_input.cpp
-}  // namespace guwange::late_input
+namespace ketsui::late_input {
+std::string Report();  // src/ketsui_late_input.cpp
+void NoteFrameDone();  // likewise: the render thread has reached a Swap's fence
+}  // namespace ketsui::late_input
 
 namespace renut::gpu::render_thread {
 
@@ -124,14 +125,43 @@ struct PendingFence {
   u32 completion_va;
   u32 fence;
   uint64_t after_callback;
+  uint64_t after_vblank = 0;  // ketsui-nx (banjo_renut_swap_at_vblank): a Swap's fence waits for this guest vblank
 };
 std::vector<PendingFence> g_pending_fences;
+uint64_t g_guest_vblanks = 0;  // ketsui-nx: GuestVblank's count (g_mutex)
+uint64_t g_items_at_fence = 0;  // ketsui-nx: g_items_queued right after the newest fence's item (g_mutex)
+uint64_t g_swap_fence_vblank = 0;  // ketsui-nx: the vblank the newest Swap fence waits for (g_mutex)
+std::atomic<uint64_t> g_swap_fences_written{0};  // ketsui-nx: Swap fences written at their vblank
+// ketsui-nx (banjo_renut_kick_idle_fence): polls' fences written at once, queued while a Swap fence waited for its
+// vblank, queued behind render-thread work or fences; polls that waited for that work first (banjo_renut_kick_busy_wait)
+// (g_mutex; the 10 s report).
+uint64_t g_poll_fences[4] = {};
+// ketsui-nx (ketsui_renut_queue_drain): the next Swap fence waits one vblank more (HoldNextSwapFence); the holds done
+// (g_mutex; the 10 s report).
+std::atomic<bool> g_hold_next_swap{false};
+uint64_t g_swap_holds = 0;
 
 // Requires g_mutex.
 void WriteFence(u32 completion_va, u32 fence) {
   if (auto *word = GuestPtr<be_u32>(completion_va))
     *word = fence;
   ++g_fences_done;
+}
+
+// Requires g_mutex: the pending completions whose callbacks have run and whose vblank has come, in order (one still
+// waiting holds back those behind it, as the console's GPU reaches its fences in order). Whether any was written.
+bool WritePendingFencesLocked() {
+  size_t written = 0;
+  for (; written < g_pending_fences.size(); ++written) {
+    const PendingFence &p = g_pending_fences[written];
+    if (p.after_callback > g_callbacks_run || p.after_vblank > g_guest_vblanks)
+      break;
+    WriteFence(p.completion_va, p.fence);
+    if (p.after_vblank)
+      g_swap_fences_written.fetch_add(1, std::memory_order_release);
+  }
+  g_pending_fences.erase(g_pending_fences.begin(), g_pending_fences.begin() + written);
+  return written != 0;
 }
 
 // Render thread only: time spent running work since the last frame ended, and
@@ -281,7 +311,16 @@ void QueuePrefetched(const void *prefetch0, const void *prefetch1, std::function
   Push(std::move(work), true, prefetch0, prefetch1, true);  // banjo-nx (from sa2-nx): the game's draws (banjo_renut_wake_batch)
 }
 
+// ketsui-nx (banjo_renut_kick_idle_wait): the newest fence's item is the last thing queued.
+void NoteFenceQueued() {
+  std::lock_guard lock(g_mutex);
+  g_items_at_fence = g_items_queued;
+}
+
 void QueueFenceCompletion(u32 completion_va, u32 fence, uint64_t after_callback) {
+  struct Note {
+    ~Note() { NoteFenceQueued(); }
+  } note;
   QueueUnlocked([completion_va, fence, after_callback] {
     bool wake;
     {
@@ -296,6 +335,109 @@ void QueueFenceCompletion(u32 completion_va, u32 fence, uint64_t after_callback)
     if (wake)
       g_done_cv.notify_all();
   });
+}
+
+void QueueSwapFenceCompletion(u32 completion_va, u32 fence, uint64_t after_callback) {
+  // The vblank the flip waits for: the first after the game's Swap (the console's GPU is there long before it). No
+  // vblank yet (the vblank thread has not started): no wait, as before.
+  uint64_t vblank;
+  {
+    std::lock_guard lock(g_mutex);
+    vblank = g_guest_vblanks ? g_guest_vblanks + 1 : 0;
+    // ketsui-nx (ketsui_renut_queue_drain): once, the vblank after that, so the next frame starts a refresh later.
+    if (vblank && g_hold_next_swap.exchange(false, std::memory_order_acq_rel)) {
+      ++vblank;
+      ++g_swap_holds;
+    }
+    g_swap_fence_vblank = vblank;
+  }
+  struct Note {
+    ~Note() { NoteFenceQueued(); }
+  } note;
+  QueueUnlocked([completion_va, fence, after_callback, vblank] {
+    bool wake;
+    {
+      std::lock_guard lock(g_mutex);
+      // The render thread has the frame's work done (its data read): the fence is written at that vblank, or now when
+      // the render thread got here after it (a late frame starts the next one at once instead of a vblank later).
+      g_pending_fences.push_back({completion_va, fence, after_callback, vblank});
+      wake = WritePendingFencesLocked() && (g_done_waiters > 0 || DoneNotifyAll());
+    }
+    if (wake)
+      g_done_cv.notify_all();
+    ketsui::late_input::NoteFrameDone();
+  });
+}
+
+uint64_t SwapFencesWritten() {
+  return g_swap_fences_written.load(std::memory_order_acquire);
+}
+
+bool IdleKickWouldWait() {
+  std::lock_guard lock(g_mutex);
+  return g_running && !g_stopping && g_items_queued == g_items_at_fence && g_swap_fence_vblank > g_guest_vblanks;
+}
+
+void HoldNextSwapFence() {
+  g_hold_next_swap.store(true, std::memory_order_release);
+}
+
+bool IdleKickBehindWork() {
+  std::lock_guard lock(g_mutex);
+  const bool behind = g_running && !g_stopping && g_items_queued == g_items_at_fence &&
+                      g_swap_fence_vblank <= g_guest_vblanks &&
+                      (g_items_done != g_items_queued || !g_pending_fences.empty());
+  g_poll_fences[3] += behind;
+  return behind;
+}
+
+bool TryCompleteIdleFence(u32 completion_va, u32 fence, uint64_t after_callback) {
+  bool wake;
+  {
+    std::lock_guard lock(g_mutex);
+    if (!g_running || g_stopping || g_items_queued != g_items_at_fence)
+      return false;  // not a poll: work was queued since the newest fence
+    if (g_swap_fence_vblank > g_guest_vblanks) {
+      ++g_poll_fences[1];
+      return false;
+    }
+    // Every item done (the fences among them written) and none pending: the render thread would write it on arrival.
+    if (g_items_done != g_items_queued || !g_pending_fences.empty() || after_callback > g_callbacks_run) {
+      ++g_poll_fences[2];
+      return false;
+    }
+    WriteFence(completion_va, fence);
+    ++g_poll_fences[0];
+    wake = g_done_waiters > 0 || DoneNotifyAll();
+  }
+  if (wake)
+    g_done_cv.notify_all();
+  return true;
+}
+
+std::string PollFenceReport() {
+  std::lock_guard lock(g_mutex);
+  const uint64_t now = g_poll_fences[0], waiting = g_poll_fences[1], busy = g_poll_fences[2],
+                 waited = g_poll_fences[3], holds = g_swap_holds;
+  g_poll_fences[0] = g_poll_fences[1] = g_poll_fences[2] = g_poll_fences[3] = 0;
+  g_swap_holds = 0;
+  if (!now && !waiting && !busy && !waited && !holds)
+    return {};
+  return fmt::format("polls (banjo_renut_kick_idle_fence): {} fences written at once, {} queued while the Swap's fence "
+                     "waited for its vblank, {} queued behind render-thread work; {} waits for the render thread "
+                     "first (banjo_renut_kick_busy_wait); {} Swap fences held a vblank more (ketsui_renut_queue_drain)",
+                     now, waiting, busy, waited, holds);
+}
+
+void GuestVblank() {
+  bool wake;
+  {
+    std::lock_guard lock(g_mutex);
+    ++g_guest_vblanks;
+    wake = WritePendingFencesLocked() && (g_done_waiters > 0 || DoneNotifyAll());
+  }
+  if (wake)
+    g_done_cv.notify_all();
 }
 
 void QueueCallbackMarker(uint64_t seq) {
@@ -322,14 +464,7 @@ void CallbacksRun(uint64_t seq) {
   {
     std::lock_guard lock(g_mutex);
     g_callbacks_run = std::max(g_callbacks_run, seq);
-    size_t written = 0;
-    for (; written < g_pending_fences.size(); ++written) {
-      const PendingFence &p = g_pending_fences[written];
-      if (p.after_callback > g_callbacks_run)
-        break;
-      WriteFence(p.completion_va, p.fence);
-    }
-    g_pending_fences.erase(g_pending_fences.begin(), g_pending_fences.begin() + written);
+    WritePendingFencesLocked();
     wake = g_done_waiters > 0 || DoneNotifyAll();  // banjo-nx (from sa2-nx)
   }
   if (wake)
@@ -399,8 +534,8 @@ void InstallLateInput() {
 }
 
 std::string LateInputReport() {
-  // guwange-nx: Guwange's own late input when it is the one installed (src/guwange_late_input.cpp).
-  if (REXCVAR_GET(futari_late_input)) return guwange::late_input::Report();
+  // guwange-nx: Guwange's own late input when it is the one installed (src/ketsui_late_input.cpp).
+  if (REXCVAR_GET(futari_late_input)) return ketsui::late_input::Report();
   const uint64_t frames = g_delay_frames.exchange(0, std::memory_order_relaxed);
   const uint64_t total = g_delay_total_us.exchange(0, std::memory_order_relaxed);
   return frames ? fmt::format("late input: the first controller read of a frame delayed {:.1f} ms on average ({} "

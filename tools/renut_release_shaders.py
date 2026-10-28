@@ -13,12 +13,13 @@ Writes into out/renut_switch_release/:
   sd/deko3d_glsl.bin        the package of the other game shaders, which the web installer makes from the player's
                             files and puts beside the NRO (this one is the Python tools' copy: game data, for tests
                             only, never distributed)
-guwange-nx (2026-10-22): of Guwange's 87 shaders the installer makes 78 from the player's files (guwange-nx-installer):
-the 68 containers default.xex stores and the 10 of the sprite effects (game_res/shader/*.cfx and pkgres/sprite_i_360.cfx
-in res/DSD000.bin and DSD100.bin, decompressed with the game's LZSS, sub_821FDE00). The other 9 are in no game file
-(not in the executables' containers, not in any archive entry: the runtime builds them, one's microcode is near the
-start of default.xex's .rdata like Futari's D3D raw programs), so the NRO carries them. app/cmake/guwange_renut_gpu.cmake
-(GUWANGE_RENUT_RELEASE_SHADERS) builds with these files.
+guwange-nx (2026-10-22): the NRO carried the 9 of Guwange's 87 shaders no game file holds; the installer made the
+other 78 from the player's files.
+ketsui-nx (2026-10-28): of Ketsui's 100 shaders the web installer (ketsui-nx-installer) makes the 88 containers
+default.xex stores (.rdata, tools/renut_dump_shaders.py) from the player's disc. The other 12 are in no game file:
+Ketsui compiles them at run time from HLSL text in its image (docs/ketsui-notes.md "Shaders"; Renut captured them,
+out/pc/shader_capture), so the NRO carries them. app/cmake/ketsui_renut_gpu.cmake (KETSUI_RENUT_RELEASE_SHADERS)
+builds with these files.
 """
 import argparse
 import os
@@ -28,10 +29,10 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# The shaders no file of the player's holds (see above): built into the NRO.
-BUILT_IN = ['ps_032176CF3775813D', 'ps_9762A7E17B1085DA', 'ps_D3A0C9040131A779', 'vs_0181A67E4F71CB15',
-            'vs_06ADC7974A7ED08A', 'vs_4B324398D9B2D460', 'vs_7B1CA326B071AA2A', 'vs_CA0583A0111C853D',
-            'vs_D901AB8F9EDBD45D']
+# The shaders no file of the player's holds (see above; the 12 Renut captured): built into the NRO.
+BUILT_IN = ['ps_11B5A46466F7084C', 'ps_3C1371A96FBE87BF', 'ps_626E051736018EE4', 'ps_62AC929909C431F4',
+            'ps_6E55FE6B89A0A842', 'ps_C1B3BF0C734B1762', 'ps_CD4E816927777340', 'vs_75834743E3F1C6A0',
+            'vs_823D73BB9E90F855', 'vs_BBB4ECD3DE3A2986', 'vs_D788E63B1833C5B1', 'vs_EBD50BE945BFB83F']
 
 
 def package(glsl_dir, names, out_dir):

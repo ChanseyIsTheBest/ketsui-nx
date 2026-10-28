@@ -1,7 +1,7 @@
-// Guwange (Xbox Live Arcade): application entry point.
+// Ketsui (Xbox Live Arcade): application entry point.
 
-#include "generated/default/guwange_init.h"
+#include "generated/default/ketsui_init.h"
 
-#include "guwange_app.h"
+#include "ketsui_app.h"
 
-REX_DEFINE_APP(guwange, GuwangeApp::Create)
+REX_DEFINE_APP(ketsui, KetsuiApp::Create)

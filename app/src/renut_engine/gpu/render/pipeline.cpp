@@ -301,7 +301,9 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineKey &key, const Pipel
                                              : plume::RenderCullMode::NONE;
   desc.frontFace = (key.mode_control & 4) ? plume::RenderFrontFace::CLOCKWISE
                                           : plume::RenderFrontFace::COUNTER_CLOCKWISE;
-  desc.depthClipEnabled = true;
+  // ketsui-nx (2026-10-28, ketsui_renut_clip_disable): the guest's clipping off -> depth clamped, not clipped (plume:
+  // Vulkan depthClampEnable, deko3d's rasterizer depthClampEnable).
+  desc.depthClipEnabled = !(key.reserved & kKeyClipDisable);
 
   // RB_DEPTHCONTROL.
   const u32 dc = key.depth_control;
@@ -601,7 +603,8 @@ bool DecodeRecord(const char *data, size_t size, Job &job) {
     std::memset(job.key.bool_mask, 0, sizeof(job.key.bool_mask));
     std::memset(job.key.bool_values, 0, sizeof(job.key.bool_values));
   }
-  job.key.reserved = 0;
+  // The A/B halves' bits go; the guest's CLIP_DISABLE stays (ketsui-nx: kKeyClipDisable).
+  job.key.reserved &= banjo::renut_gpu::ClipDisableOn() ? kKeyClipDisable : 0u;
   job.hash = HashKey(job.key);
   for (u32 s = 0; s < kMaxVertexStreams; ++s) {
     u8 used;

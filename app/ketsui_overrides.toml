@@ -1,0 +1,107 @@
+# Ketsui-specific analysis corrections for the code generator (default.xex).
+#
+# Every entry needs its evidence (which tool or which log found it).
+
+# The CRT's setjmp/longjmp (root keys: they must stay outside any table). Recompiled as plain calls, a longjmp would
+# restore r1/r31 from the jmp_buf and then return to its own caller with a foreign stack frame; with the addresses the
+# generator emits host setjmp/longjmp keyed by the guest jmp_buf. Found 2026-10-26 by Guwange's pair (0x823EBB30 /
+# 0x823EB810, the same CRT) matched with its immediates masked (scratchpad find_pattern.py, 24 words, one match each):
+#   setjmp  0x82CCCD80: the hook word (lis r4,0x832F; lwz r0,-0x3EC0(r4); bnectr), then mflr, mfcr, stfd f14,0(r3)
+#   longjmp 0x82CCC940: mr r6,r4, the SEH registration check at +312 (lwz r0,0x138(r3))
+# 25 direct calls in the game code.
+setjmp_address = 0x82CCCD80
+longjmp_address = 0x82CCC940
+
+[functions]
+# Functions the discovery missed (first codegen, 2026-10-26: "UnresolvedCall ... target not in any function"):
+# 0x82C6B120, tail-called from 0x829E0DD8: a COM-style forwarder (cmplwi cr6,r3,0; a null object returns E_INVALIDARG,
+# lis/ori 0x80070057, blr; otherwise lwz r11,0(r3) / lwz r11,72(r11) / bctr: the object's vtable slot 18), the same shape
+# as its neighbour at 0x82C6B0F8 (slot 17), ending at the bctr at 0x82C6B140.
+"0x82C6B120" = { size = 0x24 }
+# 0x82BEB468, tail-called from the adjustor thunk at 0x82BEB470: an adjustor thunk itself (addi r3,r3,8; b 0x82BE9D38),
+# between the thunks at 0x82BEB460 and 0x82BEB470.
+"0x82BEB468" = { size = 0x8 }
+
+# Code pointers into unclaimed gaps, stored in data (vtables, callback tables) or built in code (lis/addi:
+# callbacks passed at run time), accepted by tools/pointer_fixpoint.py pass 1: the scratch listing fits
+# in the gap (or continues only into a registered function it branches to: "then the registered tail"),
+# ends in a terminator and reads no register that is undefined at a function entry. The comment says
+# where the pointer is stored ("pointer at") or built ("built at", inside the code range).
+"0x8224D598" = { }  # 5 in the gap, then the registered tail sub_8224D5AC, pointer at 0x82003EB8
+"0x8224D608" = { }  # 5 in the gap, then the registered tail sub_8224D61C, pointer at 0x82003E98
+"0x828D740C" = { }  # 4 instructions, pointer at 0x8220FAC8
+"0x82900758" = { }  # 3 instructions, pointer at 0x8215103C
+"0x82907F00" = { }  # 6 instructions, pointer at 0x821516C8
+"0x82907F18" = { }  # 2 instructions, pointer at 0x821516E4
+"0x82907F38" = { }  # 2 instructions, pointer at 0x821516DC
+"0x829080D0" = { }  # 8 instructions, pointer at 0x82151730
+"0x829080F0" = { }  # 8 instructions, pointer at 0x82151734
+"0x82908110" = { }  # 8 instructions, pointer at 0x82151738
+"0x82908130" = { }  # 8 instructions, pointer at 0x8215173C
+"0x82908150" = { }  # 8 instructions, pointer at 0x82151740
+"0x82908170" = { }  # 8 instructions, pointer at 0x82151744
+"0x82908190" = { }  # 8 instructions, pointer at 0x82151748
+"0x829081B0" = { }  # 8 instructions, pointer at 0x8215174C
+"0x829081D0" = { }  # 8 instructions, pointer at 0x82151750
+"0x829081F0" = { }  # 8 instructions, pointer at 0x82151754
+"0x82909A68" = { }  # 4 instructions, built at 0x8290C038
+"0x8290F268" = { }  # 2 instructions, pointer at 0x8215166C (+1 more)
+"0x829D70D8" = { }  # 47 instructions, pointer at 0x82003FE4 (+1 more)
+"0x829F1DF0" = { }  # 11 instructions, pointer at 0x82D50138
+"0x82A4C6F8" = { }  # 4 instructions, pointer at 0x8219F71C (+8 more)
+"0x82A4CB00" = { }  # 10 instructions, pointer at 0x8219F8EC (+2 more)
+"0x82A4CB28" = { }  # 10 instructions, pointer at 0x8219F8F0 (+2 more)
+"0x82A4CB50" = { }  # 10 instructions, pointer at 0x8219F8F4 (+2 more)
+"0x82A4CB78" = { }  # 10 instructions, pointer at 0x8219F8F8 (+2 more)
+"0x82A4CFA8" = { }  # 8 instructions, pointer at 0x8219F928 (+1 more)
+"0x82A4CFC8" = { }  # 4 instructions, built at 0x82A5622C (+1 more)
+"0x82A4CFD8" = { }  # 4 instructions, built at 0x82A56354
+"0x82A4CFE8" = { }  # 4 instructions, built at 0x82A56604
+"0x82A4CFF8" = { }  # 4 instructions, built at 0x82A56654
+"0x82A4D008" = { }  # 4 instructions, built at 0x82A56434
+"0x82A4D018" = { }  # 4 instructions, built at 0x82A5618C
+"0x82A4D028" = { }  # 4 instructions, built at 0x82A566A4
+"0x82A4D038" = { }  # 4 instructions, built at 0x82A569CC
+"0x82A4D048" = { }  # 4 instructions, built at 0x82A561DC
+"0x82A4D058" = { }  # 4 instructions, built at 0x82A566F4
+"0x82AE7660" = { }  # 1 instructions, built at 0x82AD3D88 (+1 more)
+"0x82B1D148" = { }  # 29 in the gap, then the registered tail sub_82B1D1BC, built at 0x82B363E8
+"0x82B9E250" = { }  # 6 in the gap, then the registered tail sub_82B9E268, pointer at 0x821D4058
+"0x82BD82F0" = { }  # 11 instructions, pointer at 0x821D923C (+12 more)
+"0x82BEEC88" = { }  # 2 instructions, pointer at 0x821E1078 (+4 more)
+"0x82BEEC90" = { }  # 2 instructions, pointer at 0x821E1090 (+4 more)
+"0x82BEEC98" = { }  # 2 instructions, pointer at 0x821E1074 (+4 more)
+"0x82BEECA0" = { }  # 2 instructions, pointer at 0x821E10B4
+"0x82BEECB0" = { }  # 2 instructions, pointer at 0x821E1068 (+2 more)
+"0x82BF3298" = { }  # 2 instructions, pointer at 0x821E108C (+4 more)
+"0x82BF32A0" = { }  # 2 instructions, pointer at 0x821E1444
+"0x82BF32B0" = { }  # 2 instructions, pointer at 0x821E1070 (+4 more)
+"0x82BF32B8" = { }  # 2 instructions, pointer at 0x821E1428 (+1 more)
+"0x82BF35D0" = { }  # 2 instructions, pointer at 0x821E1504
+"0x82BF35E0" = { }  # 2 instructions, pointer at 0x821E10B0 (+4 more)
+"0x82BF35E8" = { }  # 2 instructions, pointer at 0x821E1084 (+4 more)
+"0x82BF35F0" = { }  # 2 instructions, pointer at 0x821E1088 (+4 more)
+"0x82BF35F8" = { }  # 2 instructions, pointer at 0x821E10A8 (+4 more)
+"0x82BF3600" = { }  # 2 instructions, pointer at 0x821E13F8 (+1 more)
+"0x82BF3608" = { }  # 2 instructions, pointer at 0x821E10A4 (+4 more)
+"0x82BF3610" = { }  # 2 instructions, pointer at 0x821E1080 (+4 more)
+"0x82BF3C50" = { }  # 6 instructions, pointer at 0x821E15DC
+"0x82BF4A88" = { }  # 2 instructions, pointer at 0x821E1570
+"0x82BF57F8" = { }  # 2 instructions, pointer at 0x821E1634
+"0x82BF5CE0" = { }  # 2 instructions, pointer at 0x821E1628
+"0x82BF8570" = { }  # 11 in the gap, then the registered tail sub_82BF859C, pointer at 0x821E17EC
+"0x82BF8800" = { }  # 2 instructions, pointer at 0x821E17AC
+"0x82C05BC8" = { }  # 2 instructions, pointer at 0x821E56B8 (+1 more)
+"0x82C2A030" = { }  # 2 instructions, built at 0x82C35BEC
+"0x82C69B50" = { }  # 8 instructions, pointer at 0x8220547C
+"0x82CB9F38" = { }  # 5 instructions, pointer at 0x8220CAA4
+"0x82CB9F70" = { }  # 2 instructions, pointer at 0x8220CA8C
+"0x82CBBD40" = { }  # 5 instructions, pointer at 0x8220D730
+
+# ketsui-nx (2026-10-27, ketsui_worker_idle_sleep): the top of Ketsui's task-thread loop (sub_829E0400, loc_829E0430:
+# `lwzx r11,r31,r28`, the task's pause flag). src/cpu/ketsui_worker_idle.cpp sleeps 1 ms there while the flag is set;
+# the loop's own test then runs as before.
+[[midasm_hook]]
+name = "KetsuiTaskPauseHook"
+address = 0x829E0430
+registers = ["r28", "r31"]

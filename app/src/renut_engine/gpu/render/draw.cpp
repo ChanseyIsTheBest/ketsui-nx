@@ -2554,8 +2554,8 @@ struct GpuStreams {
 };
 
 // banjo-nx (2026-10-18, the deko3d water): banjo_renut_diag_stream_dump_vs names a vertex shader (hex hash); its draws'
-// streams are logged (first 16): the guest source, the first two vertices as the guest has them and as converted for
-// the host, and whether a cached copy is bound.
+// streams are logged (first 16): the guest source, the first vertices as the guest has them (ketsui-nx, 2026-10-28: up
+// to six, a whole quad's triangle list) and the first two as converted for the host, and whether a cached copy is bound.
 bool StreamDumpLog(const ShaderRecord &vs, u32 stream, const StreamSource &src, const HostVertexStream &hs,
                    const u8 *guest, u32 first, u32 count, const DrawCall &call) {
   static const uint64_t want = [] {
@@ -2570,7 +2570,7 @@ bool StreamDumpLog(const ShaderRecord &vs, u32 stream, const StreamSource &src, 
   std::string guest_words, host_words;
   if (guest && count) {
     const u32 n = std::min<u32>(src.stride / 4, 16);
-    for (u32 v = 0; v < std::min<u32>(count, 2); ++v) {
+    for (u32 v = 0; v < std::min<u32>(count, 6); ++v) {
       for (u32 i = 0; i < n; ++i) {
         u32 w;
         std::memcpy(&w, guest + size_t(v) * src.stride + i * 4, 4);
@@ -3139,6 +3139,9 @@ PipelineKey MakeKey(const GuestDevice &device, const ShaderRecord *vs, const Sha
   key.stencil_ref_mask_bf = t.depth ? u32(dev.m_ValuesPacket.StencilRefMaskBF) & 0xFFFFFF : 0;
   key.mode_control = u32(cp.ModeControl) & 0x7;
   key.alpha_to_coverage = (u32(cp.ColorControl) >> 4) & 1;
+  // ketsui-nx (ketsui_renut_clip_disable): PA_CL_CLIP_CNTL.CLIP_DISABLE, no clipping (screen-space draws).
+  if (banjo::renut_gpu::ClipDisableOn() && ((u32(cp.ClipControl) >> 16) & 1))
+    key.reserved |= kKeyClipDisable;
   if (primitive == kRectangleList) {
     if (State().rectangle_list_gs)
       key.rectangle_list = 1;

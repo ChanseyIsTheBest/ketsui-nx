@@ -171,6 +171,14 @@ class ContentManager {
                                  XContentType content_type, XCONTENT_AGGREGATE_DATA& data) const;
 
   std::filesystem::path ResolveGameUserContentPath();
+  // The host folder that holds a package's files (it need not exist yet): XamContentResolve's package.
+  std::filesystem::path PackageHostPath(uint64_t xuid, const XCONTENT_AGGREGATE_DATA& data) {
+    return ResolvePackagePath(xuid, data);
+  }
+  // The size the Xbox 360 STFS package of a folder's files would have on the console (a console-made CON package: the
+  // 0xB000-byte header, the file table and the data in 4 KB blocks, two copies of each hash table): what a title sees
+  // as the package file's size through XamContentResolve. 0 when the folder does not exist.
+  static uint64_t StfsPackageSize(const std::filesystem::path& folder);
   bool IsContentOpen(const XCONTENT_AGGREGATE_DATA& data) const;
   void CloseOpenedFilesFromContent(const std::string_view root_name);
 

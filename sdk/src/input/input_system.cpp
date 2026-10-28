@@ -79,6 +79,7 @@ X_STATUS InputSystem::Setup() {
 }
 
 void InputSystem::Shutdown() {
+  std::lock_guard lock(devices_mutex_);
   // device_owners_ holds raw driver pointers.
   devices_.clear();
   device_owners_.clear();
@@ -103,6 +104,7 @@ void InputSystem::SetActiveCallback(std::function<bool()> callback) {
 }
 
 void InputSystem::SetDeviceAssignment(std::unique_ptr<DeviceAssignment> assignment) {
+  std::lock_guard lock(devices_mutex_);
   assignment_ = std::move(assignment);
   if (assignment_) {
     assignment_->OnDevicesChanged(devices_);
@@ -247,6 +249,7 @@ X_RESULT InputSystem::GetCapabilities(uint32_t user_index, uint32_t flags,
     return X_ERROR_DEVICE_NOT_CONNECTED;
   }
 
+  std::lock_guard lock(devices_mutex_);
   RefreshDevices();
   std::vector<DeviceId> ids;
   assignment_->DevicesForUser(user_index, ids);
@@ -270,18 +273,25 @@ X_RESULT InputSystem::GetCapabilities(uint32_t user_index, uint32_t flags,
 
 namespace {
 std::atomic<uint32_t (*)()> g_frame_read_delay{nullptr};
+std::atomic<uint64_t (*)()> g_frame_read_key{nullptr};  // ketsui-nx
 }  // namespace
 
 void SetFrameReadDelayFunction(uint32_t (*delay_us)()) {
   g_frame_read_delay.store(delay_us, std::memory_order_release);
 }
 
+void SetFrameReadDelayKeyFunction(uint64_t (*key)()) {
+  g_frame_read_key.store(key, std::memory_order_release);
+}
+
 X_RESULT InputSystem::GetState(uint32_t user_index, X_INPUT_STATE* out_state) {
   SCOPE_profile_cpu_f("hid");
   {  // the frame's first read: the late input (SetFrameReadDelayFunction), then the probe (rex/frame_latency.h)
     static std::atomic<uint64_t> frame{UINT64_MAX};
-    // The game's Swaps as the latency probe counts them (VdSwap, or a renderer's own Swap that calls none).
-    const uint64_t swaps = rex::latency::SwapCount();
+    // The game's Swaps as the latency probe counts them (VdSwap, or a renderer's own Swap that calls none), or what
+    // SetFrameReadDelayKeyFunction set (ketsui-nx).
+    auto* const key = g_frame_read_key.load(std::memory_order_acquire);
+    const uint64_t swaps = key ? key() : rex::latency::SwapCount();
     if (frame.exchange(swaps, std::memory_order_relaxed) != swaps) {
       static const int32_t fixed_us = REXCVAR_GET(input_frame_read_delay_us);
       uint32_t delay_us = uint32_t(std::max(fixed_us, 0));
@@ -305,6 +315,7 @@ X_RESULT InputSystem::GetState(uint32_t user_index, X_INPUT_STATE* out_state) {
     return X_ERROR_DEVICE_NOT_CONNECTED;
   }
 
+  std::lock_guard lock(devices_mutex_);  // after the late input's wait, which must not hold the other reader
   RefreshDevices();
   std::vector<DeviceId> ids;
   assignment_->DevicesForUser(user_index, ids);
@@ -344,6 +355,7 @@ X_RESULT InputSystem::SetState(uint32_t user_index, X_INPUT_VIBRATION* vibration
     return X_ERROR_DEVICE_NOT_CONNECTED;
   }
 
+  std::lock_guard lock(devices_mutex_);
   RefreshDevices();
   std::vector<DeviceId> ids;
   assignment_->DevicesForUser(user_index, ids);
@@ -392,6 +404,7 @@ X_RESULT InputSystem::GetKeystroke(uint32_t user_index, uint32_t flags,
     return X_ERROR_DEVICE_NOT_CONNECTED;
   }
 
+  std::lock_guard lock(devices_mutex_);
   RefreshDevices();
   std::vector<DeviceId> ids;
   assignment_->DevicesForUser(user_index, ids);

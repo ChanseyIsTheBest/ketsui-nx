@@ -1,0 +1,1 @@
+# Ketsui: the hand-written natives (app/src/cpu/hot/h_<ADDR>.h) and the registers they read, for the dead-store passes.

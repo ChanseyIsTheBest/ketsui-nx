@@ -18,7 +18,7 @@
  * D3D does; the GPU cache flushes they would queue are left out (the host
  * reads guest memory directly).
  */
-// guwange-nx: device offsets translated to Guwange's XDK (tools/renut_guwange_layout.py)
+// ketsui-nx: guest addresses translated to Ketsui's (tools/renut_ketsui_layout.py)
 #include <rex/frame_latency.h>
 #include <algorithm>
 #include <atomic>
@@ -51,7 +51,7 @@ using namespace renut::gpu;
 // sub_82088CE0 (N&B's 0x822399D8); a game core's copy frees its headers from
 // the core's own heap, so the core's forwarding names its copy for the call
 // (FutariRenutCallWithFree, banjo_renut_select.cpp).
-REX_IMPORT(__imp__sub_822522C8, DefaultXMemFree, void(u32, u32));
+REX_IMPORT(__imp__sub_829F3C40, DefaultXMemFree, void(u32, u32));
 namespace renut::gpu {
 thread_local PPCFunc *g_core_xmemfree = nullptr;
 }  // namespace renut::gpu
@@ -108,7 +108,7 @@ void FreeHeader(u32 va) {
 // the alignment from bits 24-27, the protection from bits 28-29), then
 // XPhysicalAlloc (0x82716060), which asks the kernel. 0 on failure.
 // futari-nx: Futari's XPhysicalAlloc is sub_82089ED8 and its flag 0x821ED308 (N&B's 0x82F39E34).
-constexpr u32 kGameNoLargePagesVa = 0x8269748C;  // XPhysicalAlloc drops MEM_LARGE_PAGES while set
+constexpr u32 kGameNoLargePagesVa = 0x83004644;  // XPhysicalAlloc drops MEM_LARGE_PAGES while set
 
 u32 AllocPhysical(u32 size, u32 attributes) {
   static constexpr u32 kAlignment[16] = {4,    4,    4,     8,     16,    32,     64,     128,
@@ -133,7 +133,7 @@ void FreePhysical(u32 va) {
 
 // The GPU format table (word_820052F8): per D3D format low 6 bits, bits per
 // pixel in the low byte, flags in the high one.
-constexpr u32 kFormatTable = 0x82008620;  // futari-nx: Futari's (N&B's 0x820052F8)
+constexpr u32 kFormatTable = 0x82149990;  // futari-nx: Futari's (N&B's 0x820052F8)
 
 u16 FormatTableEntry(u32 format) {
   const auto *table = GuestPtr<const be_u16>(kFormatTable);
@@ -146,7 +146,7 @@ u32 FormatBitsPerPixel(u32 format) {
 
 // The word at 0x82FA36C8: set while a depth surface owns the HiZ memory. futari-nx: Futari's is 0x821ED330
 // (CreateSurface sub_8209D400 and D3DResource_Destroy sub_820A3E98).
-constexpr u32 kHiZOwnerVa = 0x826974A4;
+constexpr u32 kHiZOwnerVa = 0x8300465C;
 
 u32 LoadU32(u32 va) {
   const auto *p = GuestPtr<const be_u32>(va);

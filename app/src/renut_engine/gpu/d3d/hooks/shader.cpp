@@ -12,6 +12,7 @@
  * guest objects; the host side is kept per object address, keyed by the same
  * container hash.
  */
+// ketsui-nx: guest addresses translated to Ketsui's (tools/renut_ketsui_layout.py)
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -38,7 +39,7 @@
 using namespace renut::gpu;
 
 // guwange-nx (2026-10-21): Guwange's D3DDevice_SetFVF, run first by D3DDevice_SetFVF_hook (N&B and Futari have none).
-REX_IMPORT(__imp__sub_8225FB78, OriginalSetFVF, void(u32, u32));
+REX_IMPORT(__imp__sub_828E63B8, OriginalSetFVF, void(u32, u32));
 
 namespace {
 

@@ -8,7 +8,8 @@ license of the folder it is in (see below).
 
 | Project | Used for | License |
 |---|---|---|
-| [futari-nx](https://github.com/ChanseyIsTheBest/futari-nx) by ChanseyIsTheBest | The tree this port is made from (version 1.0.1): the SDK fork, the code generator pipeline and its post-codegen steps, Renut's deko3d renderer as Futari adapted it, the native-function framework, the CPU and input-lag work, the build, PGO and release setup; Futari's own sources are still in the tree, not built | GPL-3.0; BSD-3-Clause for the SDK parts |
+| [guwange-nx](https://github.com/ChanseyIsTheBest/guwange-nx) by ChanseyIsTheBest | The tree this port is made from (version 1.0.0): Renut's deko3d renderer with Guwange's fixes and shader passes, the app layout, the configs generator, the release shaders and installer method | GPL-3.0; BSD-3-Clause for the SDK parts |
+| [futari-nx](https://github.com/ChanseyIsTheBest/futari-nx) by ChanseyIsTheBest | The tree guwange-nx is made from (version 1.0.1): the SDK fork, the code generator pipeline and its post-codegen steps, Renut's deko3d renderer as Futari adapted it, the native-function framework, the CPU and input-lag work, the build, PGO and release setup; Futari's own sources are still in the tree, not built | GPL-3.0; BSD-3-Clause for the SDK parts |
 | [sa2-nx](https://github.com/ChanseyIsTheBest/sa2-nx) by ChanseyIsTheBest | The tree futari-nx started from: the SDK fork with its Horizon layer and code generator changes, the build, PGO and release setup, the installer method and many scripts in `tools/` | GPL-3.0; BSD-3-Clause for the SDK parts |
 | [masseffect-nx](https://github.com/nebadasSwifty/masseffect-nx) by NebadasSwifty | The native renderer (`app/src/me`), the structure of `app/`, the shader library tools (`shaders/tools`), the CPU enhancement framework | GPL-3.0 |
 | banjo-nx (Banjo-Kazooie: Nuts & Bolts port) | The raw shader wrapping walk of `tools/wrap_discovered.py`, several renderer fixes | GPL-3.0 |
@@ -73,7 +74,7 @@ This port changes these files of the SDK's third-party tree; the changed copies 
 
 - `FFmpeg/libavcodec/fft_template.c` and `FFmpeg/libavcodec/mdct_template.c`
 - `FFmpeg/config.h`, plus `FFmpeg/config_switch_aarch64.h` and `FFmpeg/config_masseffect_wmv3.h` (new): the
-  configuration for AArch64 Horizon, and the WMV3 decoder that masseffect-nx added (compiled, not enabled for Guwange)
+  configuration for AArch64 Horizon, and the WMV3 decoder that masseffect-nx added (compiled in)
 - `ffmpeg-overlay/codec_list.c`: the list of registered codecs
 - `CMakeLists.txt`: builds the libraries for the Switch
 
@@ -83,20 +84,20 @@ Everything needed to rebuild and relink the NRO with a modified version of eithe
 
 ## The installer page
 
-The installer page is its own repository, [guwange-nx-installer](https://github.com/ChanseyIsTheBest/guwange-nx-installer),
-built on peggle1-nx-installer and futari-nx-installer. Its WebAssembly modules are theirs: Renut's shader translator and
-SPIRV-Cross (the same translator sources as `app/thirdparty/reblue-XenosRecomp` here), the LZX decoder and the LZX
-delta decoder (libmspack), built with [Emscripten](https://emscripten.org) (MIT and the University of Illinois/NCSA
-license). Its DXC is nfsmw-nx-installer's WebAssembly build of the unmodified
+The installer page is its own repository, [ketsui-nx-installer](https://github.com/ChanseyIsTheBest/ketsui-nx-installer),
+built on guwange-nx-installer and futari-nx-installer. Its WebAssembly modules are theirs: Renut's shader translator and
+SPIRV-Cross (the same translator sources as `app/thirdparty/reblue-XenosRecomp` here) and the LZX decoder (libmspack),
+built with [Emscripten](https://emscripten.org) (MIT and the University of Illinois/NCSA license). Its DXC is nfsmw-nx-installer's WebAssembly build of the unmodified
 [DirectXShaderCompiler](https://github.com/microsoft/DirectXShaderCompiler) v2025.1 (commit `75a029d95`), with the
 `dxc_web.cpp` wrapper that is also in `shaders/wasm/` (University of Illinois/NCSA Open Source License, with LLVM's
 license terms; SPIRV-Tools Apache-2.0; SPIRV-Headers MIT).
 
 ## Trademarks
 
-Guwange and Mushihimesama Futari are trademarks of CAVE Interactive; the icons (`app/guwange_icon.jpg`, cropped from
-the game's title artwork, and Futari's `app/futari_icon.jpg`) are CAVE's artwork. Nintendo Switch is a trademark of Nintendo. Xbox 360 is a trademark of Microsoft. This project is not
-affiliated with or endorsed by any of them.
+Ketsui: Kizuna Jigoku Tachi is a game by CAVE; its Xbox 360 edition was published by 5pb. Guwange and Mushihimesama
+Futari are trademarks of CAVE Interactive (Futari's icon, `app/futari_icon.jpg`, is CAVE's artwork). Nintendo Switch is a
+trademark of Nintendo. Xbox 360 is a trademark of Microsoft. This project is not affiliated with or endorsed by any of
+them.
 
 ## The deko3d renderer (app/src/renut_engine, app/thirdparty)
 

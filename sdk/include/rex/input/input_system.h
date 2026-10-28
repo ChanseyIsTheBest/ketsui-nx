@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <rex/input/device_assignment.h>
@@ -71,6 +72,12 @@ class InputSystem : public system::IInputSystem {
   // to be called on every GetState, SetState and GetCapabilities from the game (several per frame),
   // allocating memory and querying every driver each time. See RefreshDevices.
   std::atomic<int64_t> last_refresh_ns_{0};
+
+  // ketsui-nx (2026-10-27): Ketsui reads its controllers on two guest threads (its main loop and a task thread), and
+  // RefreshDevices rebuilt devices_ and device_owners_ under the other thread's reads: both threads crashed freeing
+  // the same DeviceInfo (std::string) in devices_.clear(), 2 of 14 PC runs. Held by GetState, SetState,
+  // GetCapabilities and GetKeystroke from their RefreshDevices to their return, and by Shutdown.
+  std::mutex devices_mutex_;
 };
 
 /// Create a default InputSystem with SDL + NOP drivers.
@@ -82,5 +89,9 @@ std::unique_ptr<InputSystem> CreateDefaultInputSystem(bool tool_mode);
 // microseconds (input_frame_read_delay_us when none is set), before it samples the controllers. Called on the game's
 // thread; nullptr removes it.
 void SetFrameReadDelayFunction(uint32_t (*delay_us)());
+// ketsui-nx (2026-10-27): what starts a frame for the delay above: the first controller read after this function's
+// value changes (by default the game's Swap count). A game that polls its controllers while it waits for its frame's
+// fence (Ketsui) starts its frame when the fence is written, not at its Swap. nullptr: the Swap count again.
+void SetFrameReadDelayKeyFunction(uint64_t (*key)());
 
 }  // namespace rex::input

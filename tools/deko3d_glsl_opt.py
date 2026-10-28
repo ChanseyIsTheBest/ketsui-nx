@@ -434,7 +434,7 @@ def pass_tess(text):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# pass: boundfmt - the vertex shader's bound fetch types as specialization constants 920-935 (guwange-nx, 2026-10-21)
+# pass: boundfmt - the vertex shader's bound fetch types as specialization constants 920-935 (ketsui-nx, 2026-10-21)
 
 BOUND_WORD = re.compile(r'g_UboShared\.v\[(6[6-9]|7[0-9]|8[01])u\]\.w')
 

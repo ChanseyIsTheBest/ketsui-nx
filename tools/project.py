@@ -83,6 +83,14 @@ def unbuilt(path):
         if path.startswith(os.path.join(src, folder) + os.sep):
             return True
     base = os.path.basename(path)
+    # Files of the ports this tree came from (futari-nx, then guwange-nx), named for their own games.
+    others = tuple(p for p in ('futari_', 'guwange_') if p != name() + '_')
+    # Renut's renderer keeps futari-nx's file names (futari_renut_hooks.h, futari_renut_vblank.cpp, ...) and is built:
+    # its hook sites are this game's (ketsui-nx, 2026-10-27: skipping them left 85 Direct3D hooks bypassed by direct
+    # calls).
+    renut = os.path.normcase(os.path.join(src, 'renut_engine')) + os.sep
+    if base.startswith(others) and path.startswith(os.path.normcase(APP) + os.sep) and not path.startswith(renut):
+        return True
     if os.path.dirname(path) == src and base.startswith('futari_'):
         return True
     if base in ('futari_d3d_functions.txt', 'futari_renut_core_hooks.cpp'):  # Futari's map, Futari's core forwarding

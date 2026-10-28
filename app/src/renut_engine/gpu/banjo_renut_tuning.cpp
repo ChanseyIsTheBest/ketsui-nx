@@ -126,6 +126,12 @@ REXCVAR_DEFINE_BOOL(banjo_deko3d_bound_fetch_spec, true, "Banjo/Enhancements",
                     "reads by another index than the vertex index are part of the pipeline (specialization constants "
                     "920-935): each such fetch decodes its one format instead of every format (Guwange's instanced "
                     "sprite shaders: 214 KB of GLSL, an 11.8 s compile at the first frame). Same pixels");
+// ketsui-nx (2026-10-28): a correctness fix, not an enhancement (no master: off brings the diagonal back).
+REXCVAR_DEFINE_BOOL(ketsui_renut_clip_disable, true, "Banjo/Renut",
+                    "Renut: a draw with the guest's clipping off (PA_CL_CLIP_CNTL.CLIP_DISABLE, which "
+                    "D3DRS_VIEWPORTENABLE false sets) is not clipped against the depth range, its depth clamped "
+                    "instead, as on the console. Ketsui's company logos draw their white background in screen space "
+                    "with a depth of 3 at one corner: clipped, half the screen stayed black along a diagonal");
 REXCVAR_DEFINE_BOOL(banjo_deko3d_tess_spec, true, "Banjo/Enhancements",
                     "deko3d renderer (2026-10-18): a pipeline that is not a tessellated draw's gives its vertex shader "
                     "the patch kind 0 as specialization constant 904: the tessellation code goes. No new pipelines. "
@@ -795,6 +801,8 @@ void StatsGameFrame() {
     const std::string probe = rex::latency::Report();
     REXLOG_INFO("[latency] {}; {}", probe.empty() ? std::string("no frame presented") : probe,
                 ::renut::gpu::render_thread::LateInputReport());
+    if (const std::string polls = ::renut::gpu::render_thread::PollFenceReport(); !polls.empty())
+      REXLOG_INFO("[latency] {}", polls);  // ketsui-nx (2026-10-28, banjo_renut_kick_idle_fence)
     if (const std::string trim = ::renut::gpu::Video::LatencyTrimReport(); !trim.empty())
       REXLOG_INFO("[latency] {}", trim);  // banjo-nx (2026-10-20, banjo_deko3d_latency_trim)
     // banjo-nx (2026-10-19, latency batch 3): the display's refresh, the phase and input -> display.
@@ -1541,6 +1549,7 @@ void LatchTuning() {
   g_latched.tess_spec = REXCVAR_GET(banjo_deko3d_tess_spec);
   g_latched.alpha_spec = REXCVAR_GET(banjo_deko3d_alpha_spec);
   g_latched.bound_fetch_spec = EnhancementActive(EnhancementGroup::kNonCpu, REXCVAR_GET(banjo_deko3d_bound_fetch_spec));
+  g_latched.clip_disable = REXCVAR_GET(ketsui_renut_clip_disable);
   g_latched.draw_resolves = REXCVAR_GET(banjo_deko3d_draw_resolves);
   g_latched.resolve_skip = REXCVAR_GET(banjo_renut_resolve_skip);
   g_latched.depth_words_lazy = REXCVAR_GET(banjo_renut_depth_words_lazy);

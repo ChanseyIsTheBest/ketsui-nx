@@ -22,7 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(ROOT, 'app')
 GEN = os.path.join(APP, 'generated')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import project  # noqa: E402  (guwange-nx, 2026-10-22: the port's modules, from its manifest)
+import project  # noqa: E402  (ketsui-nx, 2026-10-22: the port's modules, from its manifest)
 
 TREES = project.trees()
 # Futari's own native replacements (memcpy / memset, the localized hot copies): only in futari-nx's build.
@@ -127,7 +127,7 @@ def outside_entries(tree, starts):
             # export_table (a guest address inside the image).
             export_table = struct.unpack_from('>I', d, security + 4 + 4 + 256 + 4 + 4 + 4 + 20 + 4 + 20 + 16 + 16)[0]
             at = export_table - base if export_table and base <= export_table < base + len(img) else None
-            # guwange-nx (2026-10-22): the header read here is the file's own, but a title update patches the header
+            # ketsui-nx (2026-10-22): the header read here is the file's own, but a title update patches the header
             # too (the SDK applies the sibling .xexp / .dllp at load): in three of Guwange's four cores the patched
             # image has the table 0x80 bytes further on, and the file's address holds code (a bctr). A table that is
             # not one at that address is looked for in the image: the export table's magic and every entry a function.
@@ -163,8 +163,8 @@ def crt_natives(gen):
     native replacements (app/src/native/futari_native_crt.h), which read r3, r4, r5 and the bytes the originals read
     and write the bytes the originals write: for the whole-program analysis such a call reads what a call of the
     original reads (banjo-nx's hand-written natives, app/src/cpu/hot/hand.txt there). The analysis assumes nothing
-    about what a callee writes, so the natives writing fewer registers changes nothing. guwange-nx (2026-10-22): the
-    same for every port. default.xex's two have natives there too (src/cpu/guwange_native_crt.cpp); a game core's run
+    about what a callee writes, so the natives writing fewer registers changes nothing. ketsui-nx (2026-10-22): the
+    same for every port. default.xex's two have natives there too (src/cpu/ketsui_native_crt.cpp); a game core's run
     as recompiled, and they read r3, r4, r5 and the source bytes all the same. Their bodies must also stay as the
     generator wrote them: tools/find_memcalls.py recognises the two by their text, and a second run of the steps found
     no memcpy in a core whose body tools/dead_ctx_defs.py had trimmed in the first."""
@@ -186,7 +186,7 @@ def hot_functions(tree):
     path = os.path.join(APP, 'src', 'native', 'hot_functions.txt')
     names = set()
     if not FUTARI_NATIVES:
-        # guwange-nx: no localized copies (the list in the tree is futari-nx's). The module's memcpy and memset are
+        # ketsui-nx: no localized copies (the list in the tree is futari-nx's). The module's memcpy and memset are
         # left alone instead (crt_natives above: their bodies must stay what tools/find_memcalls.py recognises).
         return {'sub_%08X' % a for a in crt_natives(os.path.join(GEN, tree))}
     if os.path.isfile(path):

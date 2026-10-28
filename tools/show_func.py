@@ -3,7 +3,7 @@
 
     python tools/show_func.py <address> [--gen app/generated/default] [--calls]
 
---calls prints only its bl / b / bctr lines (the call graph one level down). guwange-nx, 2026-10-21.
+--calls prints only its bl / b / bctr lines (the call graph one level down). ketsui-nx, 2026-10-21.
 """
 import argparse
 import glob

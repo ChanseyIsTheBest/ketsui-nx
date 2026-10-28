@@ -14,7 +14,7 @@
  * instead. Neither takes State().mutex here.
  */
 // futari-nx: device offsets translated to Futari's XDK (tools/renut_futari_layout.py)
-// guwange-nx: device offsets translated to Guwange's XDK (tools/renut_guwange_layout.py)
+// ketsui-nx: guest addresses translated to Ketsui's (tools/renut_ketsui_layout.py)
 #include <rex/frame_latency.h>
 #include <algorithm>
 #include <bit>
@@ -48,15 +48,15 @@ using namespace renut::gpu;
 // parameters stands in for it.
 
 
-// guwange-nx (2026-10-22): a draw, clear or resolve of the game, for the latency trace (guwange_diag_latency_trace_s) and
-// for the late input's measure of a frame's end (src/guwange_late_input.cpp: the frame's last such call).
-namespace guwange::late_input {
+// guwange-nx (2026-10-22): a draw, clear or resolve of the game, for the latency trace (ketsui_diag_latency_trace_s) and
+// for the late input's measure of a frame's end (src/ketsui_late_input.cpp: the frame's last such call).
+namespace ketsui::late_input {
 void NoteDraw();
 }
 namespace {
 inline void NoteGuestWork(const char* what) {
   rex::latency::TraceEvent(what);
-  guwange::late_input::NoteDraw();
+  ketsui::late_input::NoteDraw();
 }
 }  // namespace
 
@@ -65,7 +65,7 @@ namespace {
 constexpr u32 kE_OUTOFMEMORY = 0x8007000Eu;
 // D3DVIEWPORT9 {0, 0, 0xFFFF, 0xFFFF, 0.0, 1.0} in N&B's data (unk_820018DC):
 // the whole surface. futari-nx: Futari's copy is at 0x820031D0.
-constexpr u32 kFullViewport = 0x820086A0;
+constexpr u32 kFullViewport = 0x821497E4;
 // D3DRS_HIZWRITEENABLE's index in the render state table.
 constexpr u32 kRenderStateHiZWriteEnable = 97;
 
@@ -572,7 +572,7 @@ void D3DDevice_Present_hook(u32 device) {
   native::SetViewport(d, viewport[0], viewport[1], viewport[2], viewport[3], viewport[4],
                       viewport[5]);
   native::SetScissorRect(d, scissor[0], scissor[1], scissor[2], scissor[3]);
-  native::Swap(device, front_buffer, device + 0x361C);
+  native::Swap(device, front_buffer, device + 0x3618);
 }
 
 // void D3DDevice_SetVertexShader(D3DDevice*, D3DVertexShader*) [0x8222A0A8]

@@ -1,0 +1,104 @@
+# Ketsui's Direct3D functions for Renut's renderer (XDK 2.0.9328, Futari's): <Renut name> <default.xex address> <why>.
+# tools/renut_ketsui_hooks.py reads it. Futari's list (futari_d3d_functions.txt) in its order: each Futari function
+# paired with the one Ketsui function of its exact instruction shape (tools/ketsui_futari_pairs.py: immediates and
+# branch displacements aside; out/ketsui_futari_pairs.txt), the d3d_match score against Futari's default.xex
+# (out/d3d_match_default.txt) beside it. A name Ketsui's default.xex lacks is a comment line (no hook site).
+# Ketsui is one executable: no game cores.
+D3D_SetSurfaceClip                           828D7A20  exact pair of Futari 82096B28; d3d_match 1.00 (next 0.24)
+D3DDevice_SetScissorRect                     828D9FD8  exact pair of Futari 820990E0; d3d_match 1.00 (next 0.30)
+D3DDevice_SetIndices                         828DA2C8  exact pair of Futari 820992F8; d3d_match 1.00 (next 0.39)
+D3D_SetViewport                              828DA6C8  exact pair of Futari 82099740; d3d_match 1.00 (next 0.36)
+D3D_SetSurfaceInfo                           828DA9D0  exact pair of Futari 82099A48; d3d_match 1.00 (next 0.18)
+D3DDevice_SetRenderTarget                    828DAA60  exact pair of Futari 82099AD8; d3d_match 1.00 (next 0.44)
+D3DDevice_SetDepthStencilSurface             828DADB0  exact pair of Futari 82099E28; d3d_match 1.00 (next 0.44)
+D3D_CleanupGprAllocationSetup                828E41E0  exact pair of Futari 8209A810; d3d_match 1.00 (next 0.12)
+XGRegisterPixelShader                        828E46C8  exact pair of Futari 8209AB48; d3d_match 1.00 (next 0.47)
+D3DDevice_SetPixelShader                     828E4700  exact pair of Futari 8209AB80; d3d_match 1.00 (next 0.89)
+D3DDevice_SetVertexShader                    828E48C0  exact pair of Futari 8209AD40; d3d_match 1.00 (next 0.89)
+D3DDevice_SetVertexDeclaration               828E4A90  exact pair of Futari 8209AF10; d3d_match 1.00 (next 0.83)
+D3DDevice_CreateVertexDeclaration            828E4B98  exact pair of Futari 8209B018; d3d_match 1.00 (next 0.65)
+D3DDevice_SetShaderGPRAllocation             828E4C18  exact pair of Futari 8209B098; d3d_match 1.00 (next 0.26)
+D3DDevice_CreatePixelShader                  828E60E0  exact pair of Futari 8209B2B0; d3d_match 1.00 (next 0.63)
+XGRegisterVertexShader                       828E61D0  exact pair of Futari 8209B3A0; d3d_match 1.00 (next 0.25)
+D3DDevice_CreateVertexShader                 828E62C8  exact pair of Futari 8209B498; d3d_match 1.00 (next 0.63)
+D3D_GetTextureDimensions                     828E0768  exact pair of Futari 8209B5D8; d3d_match 1.00 (next 0.85)
+D3D_GetGpuTextureDimensions                  828E0800  exact pair of Futari 8209B670; d3d_match 1.00 (next 0.85)
+D3DArrayTexture_UnlockRect                   828E08A0  exact pair of Futari 8209B710; d3d_match 1.00 (next 0.83)
+D3DSurface_UnlockRect                        828E08B8  exact pair of Futari 8209B728; d3d_match 1.00 (next 0.83)
+D3D_BlockSizeOfGpuFormat                     828E0940  exact pair of Futari 8209B740; d3d_match 1.00 (next 0.26)
+D3D_GetMaxMipLevels                          828E09D8  exact pair of Futari 8209B7D8; d3d_match 1.00 (next 0.17)
+D3D_FindTextureSize                          828E0B80  exact pair of Futari 8209B980; d3d_match 1.00 (next 0.21)
+D3D_GetMipTailLevelOffsetCoords              828E0EF0  exact pair of Futari 8209BCF0; d3d_match 1.00 (next 0.16)
+D3D_Lock2DSurface                            828E1BD8  exact pair of Futari 8209C9D8; d3d_match 1.00 (next 0.53)
+D3D_Lock3DSurface                            828E1C68  exact pair of Futari 8209CA68; d3d_match 1.00 (next 0.53)
+D3DBaseTexture_GetLevelCount                 828E2280  exact pair of Futari 8209D080; d3d_match 1.00 (next 0.80)  # SAME ADDRESS AS D3DArrayTexture_GetArraySize
+# D3DArrayTexture_GetArraySize 828E2280: the same function as D3DBaseTexture_GetLevelCount (folded, as in Futari): hooked once, as GetLevelCount
+D3DLineTexture_LockRect                      828E2348  exact pair of Futari 8209D148; d3d_match 1.00 (next 0.43)
+D3DDevice_CreateTexture                      828E24E0  exact pair of Futari 8209D2E0; d3d_match 1.00 (next 0.30)
+D3DDevice_CreateSurface                      828E2600  exact pair of Futari 8209D400; d3d_match 1.00 (next 0.31)
+D3DSurface_GetDesc                           828E2738  exact pair of Futari 8209D538; d3d_match 1.00 (next 0.66)
+D3DSurface_LockRect                          828E27D0  exact pair of Futari 8209D5D0; d3d_match 1.00 (next 0.44)
+D3DVolume_GetDesc                            828E27F8  exact pair of Futari 8209D5F8; d3d_match 1.00 (next 0.79)
+D3DVolume_LockBox                            828E2840  exact pair of Futari 8209D640; d3d_match 1.00 (next 0.71)
+D3DDevice_EndIndexedVertices                 828E9680  exact pair of Futari 8209D7F0; d3d_match 1.00 (next 0.75)
+D3DDevice_BeginVertices                      828E9690  exact pair of Futari 8209D800; d3d_match 1.00 (next 0.74)
+# D3DVertexShader_Bind: not in Ketsui: no function has Futari's 94 instructions' shape (d3d_match's 0.22 is XGRegisterVertexShader 828E61D0); Futari's 22 calls were its game's
+D3DDevice_ClearF                             828DC240  exact pair of Futari 820A18C8; d3d_match 1.00 (next 0.40)
+D3DDevice_Clear                              828DC368  exact pair of Futari 820A19F0; d3d_match 1.00 (next 0.37)
+D3DDevice_Resolve                            828DCBF8  exact pair of Futari 820A2280; d3d_match 1.00 (next 0.33)
+D3DResource_GetType                          828EA518  exact pair of Futari 820A3188; d3d_match 1.00 (next 0.34)
+D3DResource_AddRef                           828EA810  exact pair of Futari 820A3480; d3d_match 1.00 (next 0.84)
+D3DDevice_EndExport                          828EB070  exact pair of Futari 820A3C38; d3d_match 1.00 (next 0.20)
+D3DResource_Release                          828EB838  exact pair of Futari 820A4400; d3d_match 1.00 (next 0.84)
+D3D_CBlocker_Check                           828F5A88  exact pair of Futari 820A4590; d3d_match 1.00 (next 0.30)
+D3DDevice_Release                            828F5BB0  exact pair of Futari 820A46B8; d3d_match 1.00 (next 0.74)
+D3DDevice_UnsetAll                           828F5C58  exact pair of Futari 820A4790; d3d_match 1.00 (next 0.38)
+Direct3D_CreateDevice                        828F5F88  exact pair of Futari 820A4AC0; d3d_match 1.00 (next 0.45)
+D3DDevice_Swap                               828DE310  exact pair of Futari 820A5408; d3d_match 1.00 (next 0.13)
+D3DDevice_GetDeviceCaps                      828EC3F8  exact pair of Futari 820A5B68; d3d_match 1.00 (next 0.67)
+D3D_CDevice_AllocateInlineData               828DF0D0  exact pair of Futari 820A8138; d3d_match 1.00 (next 0.37)
+D3DDevice_BlockOnFence                       828DF288  exact pair of Futari 820A82F0; d3d_match 1.00 (next 0.67)
+D3D_CDevice_KickOffSegment                   828DFDD0  exact pair of Futari 820A8E38; d3d_match 1.00 (next 0.24)
+D3D_CDevice_KickOff                          828DFF58  exact pair of Futari 820A8FC0; d3d_match 1.00 (next 0.38)
+D3DDevice_IsFencePending                     828E00F0  exact pair of Futari 820A90F8; d3d_match 1.00 (next 0.71)
+D3DDevice_SetPredication                     828F04C0  exact pair of Futari 820ABB60; d3d_match 1.00 (next 0.40)
+D3DDevice_DrawVerticesUP                     828E9B28  exact pair of Futari 8209DC98; d3d_match 1.00 (next 0.56)
+D3D_RingBufferDeviceAllocate                 828DEEA0  exact pair of Futari 820A7F08; d3d_match 1.00 (next 0.15)
+D3D_CDevice_BeginRingBig                     828E01E8  exact pair of Futari 820A91F0; d3d_match 1.00 (next 0.45)
+D3DDevice_SetRingBufferParameters            828E0330  exact pair of Futari 820A92E0; d3d_match 1.00 (next 0.15)
+D3D_SynchronizeToPresentationInterval        828DDEE0  exact pair of Futari 820A4FD8; d3d_match 1.00 (next 0.28)
+D3D_ResetAllState                            828DA5D0  exact pair of Futari 82099648; d3d_match 1.00 (next 0.43)
+D3DDevice_SetScreenExtentQueryMode           828EC438  exact pair of Futari 820A5BC8; d3d_match 1.00 (next 0.81)
+D3DDevice_SetViewport                        828DA930  exact pair of Futari 820999A8; d3d_match 1.00 (next 0.46)
+D3DDevice_SetTexture                         828E2860  exact pair of Futari 8209D660; d3d_match 1.00 (next 0.42)
+D3DDevice_SetStreamSource                    828DA120  exact pair of Futari 820991D8; d3d_match 1.00 (next 0.42)
+D3D_AlignTextureDimensions                   828E0A60  exact pair of Futari 8209B860; d3d_match 1.00 (next 0.19)
+D3D_CDevice_BlockOnFence                     828DF1B8  exact pair of Futari 820A8220; d3d_match 1.00 (next 0.42)
+D3DResource_Destroy                          828EB2D0  exact pair of Futari 820A3E98; d3d_match 1.00 (next 0.26)
+# Not in Futari's list (Futari links none of them or, where noted, leaves its copy unmapped): Ketsui's draws through DrawVertices /
+# DrawIndexedVerticesUP and vertex / index buffers (guwange-nx mapped the same functions for Guwange's draw path).
+# Found with d3d_match against Guwange's default.xex (out/d3d_match_guwange.txt; Guwange's own map names them)
+# and compared instruction by instruction with Guwange's: equal but branch targets and globals (d = words that
+# differ otherwise); each has direct callers in Ketsui (the count).
+D3DDevice_DrawVertices                       828EA128  d3d_match vs Guwange 82262DF0 1.00 (next 0.75); 5 calls; Guwange d2 (its ring words); 65535-vertex chunks
+D3DDevice_CreateVertexBuffer                 828EA8F0  d3d_match vs Guwange 822541E0 1.00 (next 0.68); 2 calls
+D3DDevice_CreateIndexBuffer                  828EA9C8  d3d_match vs Guwange 822542B8 1.00 (next 0.68); 1 call
+D3DVertexBuffer_Lock                         828EB8B8  d3d_match vs Guwange 822551A8 1.00 (next 0.68); 2 calls
+D3DVertexBuffer_Unlock                       828EA9B8  d3d_match vs Guwange 822542A8 1.00 (next 0.75); 2 calls
+D3DIndexBuffer_Lock                          828EB908  d3d_match vs Guwange 82255248 1.00 (next 0.67); 1 call
+D3DConstantBuffer_Unlock                     828EAA78  d3d_match vs Guwange 82254368 1.00 (next 0.75); 1 call
+D3DDevice_GetDisplayMode                     828EC410  d3d_match vs Guwange 82267108 1.00 (next 0.62); 2 calls; Guwange d4 (its +0x35BC.. -> Futari's +0x35B8..)
+D3DDevice_AcquireThreadOwnership             828F5C08  d3d_match vs Guwange 82258D70 1.00 (next 0.82); 2 calls
+D3DDevice_ReleaseThreadOwnership             828F5C48  d3d_match vs Guwange 82258DB0 1.00 (next 0.75); 2 calls
+D3D_Get2DSurfaceDesc                         828E1418  d3d_match vs Guwange 8225A2D8 1.00 (next 0.97); 1 call; Futari has it too (8209C218, unmapped)
+D3D_Get3DSurfaceDesc                         828E1518  d3d_match vs Guwange 8225A3D8 1.00 (next 0.97); 1 call; Futari has it too (8209C318, unmapped)
+D3DDevice_InsertCallback                     828E02D8  d3d_match vs Guwange 8226A9D0 1.00 (next 0.65); 1 call
+D3DDevice_Present                            828DE970  d3d_match vs Guwange 82265CA0 1.00 (next 0.43); 2 calls; Guwange d7 (the present parameters +0x361C -> Futari's +0x3618); Futari has it too (820A5A68, unmapped)
+D3DDevice_SetFVF                             828E63B8  d3d_match vs Guwange 8225FB78 1.00 (next 0.70); 1 call; Futari has it too (8209B588, unmapped); guwange-nx's hook runs the original first, then records the declaration
+# Not in Futari or Guwange; found against N&B's Direct3D (banjo-nx's reNut names, out/d3d_match_nb_full.txt):
+D3DDevice_DrawIndexedVerticesUP              828EA088  d3d_match vs N&B 82656728 0.97 (next 0.28); 1 call
+# Left to Ketsui's own code (they only read or write device fields the renderer keeps as Direct3D does; Futari
+# runs its copies of them too): the render and sampler state setters and getters (207 of the renderer's 222 such
+# hooks match a Ketsui function), D3DDevice_GetViewport 828DA0D0, D3DDevice_SetClipPlane 828DA580, the gamma
+# setter 828DA4B0 (SetGammaRamp or SetPWLGamma: N&B's two are the same shape), D3D_IsFusion 82C85200 and the
+# busy query 828E0058 (KickOff, then the fence).

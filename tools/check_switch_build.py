@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Checks a Switch build before it is packaged (sa2-nx's tools/check_switch_build.py, from sasrt-nx and nfsmw-nx).
 
-  python tools/check_switch_build.py [--elf out/switch/guwange] [--nro out/switch/guwange.nro]
+  python tools/check_switch_build.py [--elf out/switch/ketsui] [--nro out/switch/ketsui.nro]
 
 Checks (exit 1 if any fails):
   - _start is at address 0 (nfsmw-nx: a section-ordering file that moved the start-up code made the NRO unbootable;
     app/hot_functions.ld starts with KEEP(*(.crt0)) for that reason);
   - the NRO links the nfsmw NVK driver of the SDK (its "Mesa x.y.z" string; the generic portlibs Mesa once got in),
     or, built with FUTARI_SWITCH_NVK=OFF (the default since 2026-10-20: deko3d only), carries no Mesa at all;
-  - no vector fmla/fmls in recompiled functions: the generated code has no vector fused multiply-add (VMX
-    multiply-adds are a multiply and an add), so any would be contraction that leaked past -ffp-contract=off (e.g. at
-    the LTO link). Scalar fmadd/fmsub/fnmadd/fnmsub come from the guest's own std::fma and are only counted.
+  - no vector fmla/fmls in recompiled functions but those of vmx_fused_madd: the generated code's VMX multiply-adds
+    are a multiply and an add, except with the generator option vmx_fused_madd (ketsui-nx's app/ketsui_perf.toml:
+    vmaddfp / vmaddcfp128 / vnmsubfp fused as the Xbox 360 does, rex::ppc::vmx_madd_ps, one vfmaq_f32), so any other
+    would be contraction that leaked past -ffp-contract=off (e.g. at the LTO link). Expected: every function whose
+    generated text has the helper or inlines one that has, and (LTO) a function whose direct calls reach such functions
+    within two calls, with no more fmla than their helpers (feedingfrenzy2-nx's rule, peggle2-nx's tree). Scalar
+    fmadd/fmsub/fnmadd/fnmsub come from the guest's own std::fma and are only counted.
   - no table lookup indexed by its own table (`tbl vA, {vB}, vB`, or the index among the registers of a two-register
     table) in recompiled code: the symptom of devkitA64 GCC 16.1's early register allocation pass dropping the
     lookups of the NEON vperm helper and overwriting a register (peggle2-nx, 2026-10-13; the build sets
@@ -32,10 +36,59 @@ DEVKITA64 = next((d + '/devkitA64/bin/' for d in (os.environ.get('DEVKITPRO', ''
 EXE = '.exe' if os.name == 'nt' else ''
 
 
+def FusedMaddFunctions(gen):
+    """The functions of the generated tree with rex::ppc::vmx_madd_ps, and those that inline one of them
+    (REX_INL / inl_sub_X copies) (feedingfrenzy2-nx's)."""
+    import glob
+    texts = {}
+    for path in glob.glob(os.path.join(gen, '*_recomp.*.cpp')):
+        src = open(path, encoding='utf-8', errors='replace').read()
+        for m in re.finditer(r'^(?:DEFINE_REX_FUNC\((sub_[0-9A-F]{8})\)|static inline void inl_(sub_[0-9A-F]{8})\()', src, re.M):
+            name = m.group(1) or m.group(2)
+            end = src.find('\n}', m.end())
+            texts[name] = texts.get(name, '') + src[m.end():end if end > 0 else len(src)]
+    out = {n for n, body in texts.items() if 'vmx_madd_ps' in body}
+    for _ in range(3):
+        for n, body in texts.items():
+            if n not in out and any(('inl_' + d) in body or ('REX_INL(' + d + ')') in body for d in out):
+                out.add(n)
+    return out
+
+
+def MaddCounts(gen):
+    """name -> how many rex::ppc::vmx_madd_ps calls its generated body has."""
+    import glob
+    out = {}
+    for path in glob.glob(os.path.join(gen, '*_recomp.*.cpp')):
+        src = open(path, encoding='utf-8', errors='replace').read()
+        heads = list(re.finditer(r'^DEFINE_REX_FUNC\((sub_[0-9A-F]{8})\)', src, re.M))
+        for i, m in enumerate(heads):
+            end = heads[i + 1].start() if i + 1 < len(heads) else len(src)
+            n = src.count('vmx_madd_ps', m.end(), end)
+            if n:
+                out[m.group(1)] = n
+    return out
+
+
+def generated_calls(gen):
+    """name -> the recompiled functions its generated C++ body calls directly."""
+    import glob
+    out = {}
+    head = re.compile(r'^DEFINE_REX_FUNC\((sub_[0-9A-F]{8})\) \{$', re.M)
+    call = re.compile(r'\b(?:__imp__)?(sub_[0-9A-F]{8})\(ctx, base\)')
+    for path in glob.glob(os.path.join(gen, '*_recomp.*.cpp')):
+        text = open(path, encoding='utf-8', errors='replace').read()
+        heads = list(head.finditer(text))
+        for i, m in enumerate(heads):
+            end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+            out[m.group(1)] = set(call.findall(text, m.end(), end))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--elf', default=os.path.join(ROOT, 'out', 'switch', 'guwange'))
-    ap.add_argument('--nro', default=os.path.join(ROOT, 'out', 'switch', 'guwange.nro'))
+    ap.add_argument('--elf', default=os.path.join(ROOT, 'out', 'switch', 'ketsui'))
+    ap.add_argument('--nro', default=os.path.join(ROOT, 'out', 'switch', 'ketsui.nro'))
     ap.add_argument('--sdk-vulkan', default='C:/devkitPro/mesa-switch-main-nfsmw-source/mesa-switch-main/'
                     'mesa-unified-install/opt/devkitpro/portlibs/switch/lib/libvulkan.a')
     a = ap.parse_args()
@@ -109,6 +162,27 @@ def main():
         elif op in ('fmadd', 'fmsub', 'fnmadd', 'fnmsub') and guest:
             scalar_fma += 1
     proc.wait()
+    gen = os.path.join(ROOT, 'app', 'generated', 'default')
+    fused = FusedMaddFunctions(gen)
+    vmx_fused = {f: n for f, n in vector_fma.items() if f.replace('__imp__', '') in fused}
+    for f in vmx_fused:
+        del vector_fma[f]
+    print(f'vector fused multiply-adds of vmx_fused_madd (vmx_madd_ps): {sum(vmx_fused.values())} in '
+          f'{len(vmx_fused)} functions ({len(fused)} functions of the generated code use the helper)')
+    lto_inlined = []
+    if vector_fma:
+        calls = generated_calls(gen)
+        madds = MaddCounts(gen)
+        for f, n in list(vector_fma.items()):
+            name = f.replace('__imp__', '')
+            reach = set(calls.get(name, ()))
+            reach |= {d for c in list(reach) for d in calls.get(c, ())}
+            helpers = sorted(c for c in reach if c in fused)
+            if helpers and n <= sum(madds.get(c, 0) for c in helpers):
+                lto_inlined.append(f'{name} x{n} (inlines {", ".join(helpers)})')
+                del vector_fma[f]
+    if lto_inlined:
+        print(f'vector fused multiply-adds of vmx_fused_madd inlined by LTO: {"; ".join(lto_inlined)}')
     print(f'fused multiply-adds in recompiled functions: scalar {scalar_fma} (the guest\'s own), vector '
           f'{sum(vector_fma.values())} in {len(vector_fma)} functions (must be 0)')
     if vector_fma:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guest loops that can never end, made explicit (post-codegen step; guwange-nx, 2026-10-21).
+"""Guest loops that can never end, made explicit (post-codegen step; ketsui-nx, 2026-10-21).
 
 A loop of the generated code whose header is followed only by compares and a branch back to it (the guest's
 `cmpwi cr6,r11,0; beq cr6,.` after loading r11 once, or a plain `b .`) changes nothing it tests: entered once, it never
@@ -20,7 +20,7 @@ import os
 import re
 import sys
 
-MACRO = ('// guwange-nx (tools/spin_forever.py): a guest loop that can never end, kept by a call the compiler cannot '
+MACRO = ('// ketsui-nx (tools/spin_forever.py): a guest loop that can never end, kept by a call the compiler cannot '
          'remove (the thread sleeps for good).\n'
          '[[noreturn]] void rex_spin_forever();\n'
          '#define REX_SPIN_FOREVER() rex_spin_forever()\n')

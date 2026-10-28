@@ -48,6 +48,7 @@ struct Latched {
   bool tess_spec = false;
   bool alpha_spec = false;
   bool bound_fetch_spec = false;  // guwange-nx
+  bool clip_disable = false;      // ketsui-nx
   bool draw_resolves = false;
   bool resolve_skip = false;
   bool depth_words_lazy = false;
@@ -231,6 +232,8 @@ inline bool AlphaSpecOn() { return Latch().alpha_spec; }
 // guwange-nx (banjo_deko3d_bound_fetch_spec, 2026-10-21): the bound fetches' declaration types in the pipeline key
 // (constants 920-935).
 inline bool BoundFetchSpecOn() { return Latch().bound_fetch_spec; }
+// ketsui-nx (ketsui_renut_clip_disable, 2026-10-28): the guest's CLIP_DISABLE in the pipeline key (kKeyClipDisable).
+inline bool ClipDisableOn() { return Latch().clip_disable; }
 // banjo_deko3d_tess_spec / banjo_deko3d_vs_outputs (2026-10-18): constants 904 and 905 of the deko3d shaders.
 inline bool TessSpecOn() { return Latch().tess_spec; }
 bool Deko3DVsOutputsOn();

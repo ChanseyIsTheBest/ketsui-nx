@@ -1,0 +1,38 @@
+# Ketsui: hand-picked localized copies (tools/localize_native.py --list): <address> <what>. The optimisation round of
+# 2026-10-27 (docs/ketsui-notes.md): the 35 hottest guest functions of a PC profile of gameplay (out/pc_profile_round1.log,
+# windows 3-14, tools/hot_candidates.py: self samples; tiny leaves, atomics, hooked and huge functions left out).
+828C8A28 PC profile 3202 samples, 1056 instructions, calls (42)
+82C09230 PC profile 1306 samples, 252 instructions, calls (2)
+82C0E4E8 PC profile 1093 samples, 458 instructions, calls (3)
+82C0D218 PC profile 701 samples, 260 instructions, calls (1)
+82C08798 PC profile 651 samples, 186 instructions, calls (3)
+829D9BB8 PC profile 636 samples, 38 instructions, leaf
+828E4440 PC profile 610 samples, 54 instructions, leaf
+82C03B70 PC profile 355 samples, 74 instructions, calls (10)
+82C1F590 PC profile 312 samples, 130 instructions, calls (9)
+822E8348 PC profile 289 samples, 3734 instructions, calls (34)
+828C9BB8 PC profile 263 samples, 196 instructions, calls (4)
+828C9AA8 PC profile 256 samples, 68 instructions, leaf
+82C09620 PC profile 237 samples, 248 instructions, calls (1)
+82BF6AF8 PC profile 197 samples, 278 instructions, calls (12)
+82C63DF0 PC profile 147 samples, 40 instructions, calls (1)
+82C1E2D8 PC profile 143 samples, 56 instructions, leaf
+82C72D18 PC profile 124 samples, 70 instructions, leaf
+82C1D818 PC profile 123 samples, 24 instructions, calls (1)
+829E2290 PC profile 101 samples, 290 instructions, leaf
+829E27C0 PC profile 88 samples, 40 instructions, leaf
+828C9EC8 PC profile 82 samples, 112 instructions, calls (1)
+822B6148 PC profile 79 samples, 2118 instructions, calls (3)
+82309B48 PC profile 74 samples, 310 instructions, calls (5)
+82BF5460 PC profile 74 samples, 106 instructions, calls (7)
+82619B28 PC profile 68 samples, 5582 instructions, calls (44)
+822A8CF8 PC profile 66 samples, 460 instructions, calls (3)
+822BA0F0 PC profile 66 samples, 320 instructions, calls (1)
+829DCE58 PC profile 62 samples, 86 instructions, calls (10)
+828C3770 PC profile 57 samples, 444 instructions, calls (23)
+82C1EB18 PC profile 53 samples, 106 instructions, calls (7)
+822EBFF0 PC profile 50 samples, 1716 instructions, calls (8)
+82C1D638 PC profile 50 samples, 38 instructions, calls (3)
+82C74BF8 PC profile 49 samples, 16 instructions, calls (1)
+82BEE0B8 PC profile 49 samples, 54 instructions, calls (3)
+82C687A0 PC profile 43 samples, 84 instructions, calls (3)
