@@ -1,6 +1,6 @@
 <p align=center><img src="app/ketsui_icon.jpg" alt="Ketsui: Kizuna Jigoku Tachi" width="256" height="256"></p>
 
-<h1 align=center>Ketsui: Kizuna Jigoku Tachi: Nintendo Switch port</h1>
+<h1 align=center>Ketsui: Kizuna Jigoku Tachi — Nintendo Switch port</h1>
 
 <p align=center><b>ketsui-nx 1.0.0</b> · <a href="https://chanseyisthebest.github.io/ketsui-nx-installer/">web installer</a> · <a href="https://github.com/ChanseyIsTheBest/ketsui-nx/releases/tag/v1.0.0">release</a></p>
 
